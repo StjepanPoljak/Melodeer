@@ -38,6 +38,10 @@ static ALCcontext       *MDAL__context;
 static ALuint           *MDAL__buffers;
 static ALuint           MDAL__source;
 
+int     MDAL__pop_error             (char *message, int code);
+ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
+void    MD__remove_buffer_head      ();
+
 void MD__play(char *filename, void *decoder_func(void *))
 {
     pthread_t decoder_thread;
@@ -92,7 +96,7 @@ void MD__play(char *filename, void *decoder_func(void *))
 
             continue;
         }
-        pthread_mutex_unlock(&MD__mutex);
+        pthread_mutex_unlock (&MD__mutex);
 
         if (initialized)
         {
@@ -174,16 +178,19 @@ void MD__play(char *filename, void *decoder_func(void *))
             for(int i=0; i<MD__buff_num; i++)
             {
                 pthread_mutex_lock (&MD__mutex);
-                alBufferData (MDAL__buffers[i], MD__format, MD__current_chunk->chunk,
-                              MD__current_chunk->size, (ALuint)MD__sample_rate);
+                alBufferData (MDAL__buffers[i],
+                              MD__format,
+                              MD__current_chunk->chunk,
+                              MD__current_chunk->size,
+                              (ALuint)MD__sample_rate);
 
                 if (MD__current_chunk->next != NULL) {
 
                     MD__current_chunk = MD__current_chunk->next;
                 }
                 else if (MD__decoding_done) {
-
                     pthread_mutex_unlock (&MD__mutex);
+
                     break;
                 }
                 pthread_mutex_unlock (&MD__mutex);
@@ -374,6 +381,7 @@ void MD__add_to_buffer_raw (unsigned char data) {
         new_chunk->size = 0;
         new_chunk->order = 0;
         new_chunk->chunk [new_chunk->size++] = data;
+        new_chunk->next = NULL;
 
         if (MD__last_chunk == NULL && MD__first_chunk == NULL) {
 
@@ -389,17 +397,50 @@ void MD__add_to_buffer_raw (unsigned char data) {
     }
 }
 
+void MD__add_buffer_chunk_ncp (unsigned char* data, unsigned int size)
+{
+    MDBufferChunk *new_chunk = malloc (sizeof (MDBufferChunk));
+    new_chunk->chunk = data;
+    new_chunk->next = NULL;
+    new_chunk->size = size;
+
+    if (MD__last_chunk == NULL && MD__first_chunk == NULL) {
+
+        MD__first_chunk = new_chunk;
+        MD__last_chunk = new_chunk;
+        new_chunk->order = 0;
+    }
+    else {
+
+        new_chunk->order = MD__last_chunk->order + 1;
+        MD__last_chunk->next = new_chunk;
+        MD__last_chunk = new_chunk;
+    }
+}
+
+
+unsigned int MD__get_buffer_size () {
+
+    pthread_mutex_lock (&MD__mutex);
+    unsigned int buff_temp_size = MD__buff_size;
+    pthread_mutex_unlock (&MD__mutex);
+
+    return buff_temp_size;
+}
+
+unsigned int MD__get_buffer_num () {
+
+    pthread_mutex_lock (&MD__mutex);
+    unsigned int buff_temp_num = MD__buff_num;
+    pthread_mutex_unlock (&MD__mutex);
+
+    return buff_temp_num;
+}
+
 void MD__decoding_done_signal () {
 
     pthread_mutex_lock (&MD__mutex);
     MD__decoding_done = true;
-    pthread_mutex_unlock (&MD__mutex);
-}
-
-void MD__metadata_loaded_signal () {
-
-    pthread_mutex_lock (&MD__mutex);
-    MD__metadata_loaded = true;
     pthread_mutex_unlock (&MD__mutex);
 }
 
@@ -417,6 +458,7 @@ void MD__set_metadata (unsigned int sample_rate,
     pthread_mutex_lock (&MD__mutex);
     MD__sample_rate         = sample_rate;
     MD__channels            = channels;
+
     MD__format              = MDAL__get_format (channels, bps);
 
     if (MD__format) {

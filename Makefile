@@ -1,8 +1,11 @@
 proj=melodeer
-compile=gcc main.o mdcore.o mdflac.o -l openal -l FLAC -pthread -o $(proj)
+compile=gcc main.o mdcore.o mdflac.o mdwav.o -l openal -l FLAC -pthread -o $(proj)
 
-$(proj): main.o mdcore.o mdflac.o
+$(proj): main.o mdcore.o mdflac.o mdwav.o
 	$(compile)
+
+mdwav.o: mdwav.c mdwav.h
+	gcc -c mdwav.c -o mdwav.o -O3
 
 mdflac.o: mdflac.c mdflac.h
 	gcc -c mdflac.c -o mdflac.o -O3
@@ -15,7 +18,7 @@ main.o: main.c
 
 .PHONY=clean
 clean:
-	-rm main.o mdcore.o mdflac.o $(proj)
+	-rm main.o mdcore.o mdflac.o mdwav.o $(proj)
 
 .PHONY=build
 build:
