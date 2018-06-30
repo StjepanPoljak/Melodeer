@@ -22,7 +22,7 @@ void    MD__play                    (char *filename,
                                                               unsigned int total_samples));
 void    MD__decoding_done_signal    ();
 void    MD__decoding_error_signal   ();
-void    MD__set_metadata            (unsigned int sample_rate,
+bool    MD__set_metadata            (unsigned int sample_rate,
                                      unsigned int channels,
                                      unsigned int bps,
                                      unsigned int total_samples);

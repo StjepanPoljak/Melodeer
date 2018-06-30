@@ -1,18 +1,22 @@
 #include "mdflac.h"
 #include "mdcore.h"
 
+unsigned int            MDFLAC__bps         = 0;
+unsigned int            MDFLAC__channels    = 0;
+FLAC__StreamDecoder     *MDFLAC__decoder    = 0;
+
 void *MDFLAC__start_decoding (void *filename)
 {
     FLAC__bool                      ok = true;
-    FLAC__StreamDecoder             *decoder = 0;
+
     FLAC__StreamDecoderInitStatus   init_status;
 
-    if ((decoder = FLAC__stream_decoder_new ()) == NULL) {
+    if ((MDFLAC__decoder = FLAC__stream_decoder_new ()) == NULL) {
 
         MD__decoding_error_signal ();
     }
 
-    init_status = FLAC__stream_decoder_init_file (decoder,
+    init_status = FLAC__stream_decoder_init_file (MDFLAC__decoder,
                                                   (char *) filename,
                                                   MDFLAC__write_callback,
                                                   MDFLAC__metadata_callback,
@@ -26,10 +30,11 @@ void *MDFLAC__start_decoding (void *filename)
 
     if (ok) {
 
-        ok = FLAC__stream_decoder_process_until_end_of_stream (decoder);
+        ok = FLAC__stream_decoder_process_until_end_of_stream (MDFLAC__decoder);
     }
 
-    FLAC__stream_decoder_delete(decoder);
+    FLAC__stream_decoder_finish(MDFLAC__decoder);
+    FLAC__stream_decoder_delete(MDFLAC__decoder);
 
     MD__decoding_done_signal();
 
@@ -39,8 +44,8 @@ void *MDFLAC__start_decoding (void *filename)
     }
 
     MD__exit_decoder();
-
 }
+
 
 void MDFLAC__metadata_callback (const FLAC__StreamDecoder   *decoder,
                                 const FLAC__StreamMetadata  *metadata,
@@ -50,33 +55,44 @@ void MDFLAC__metadata_callback (const FLAC__StreamDecoder   *decoder,
 
 	if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
 
-        MD__set_metadata (metadata->data.stream_info.sample_rate,
-                          metadata->data.stream_info.channels,
-                          metadata->data.stream_info.bits_per_sample,
-                          metadata->data.stream_info.total_samples);
-	}
+        MDFLAC__bps = metadata->data.stream_info.bits_per_sample;
+        MDFLAC__channels = metadata->data.stream_info.channels;
+
+        bool meta_ok = MD__set_metadata (metadata->data.stream_info.sample_rate,
+                                         metadata->data.stream_info.channels,
+                                         metadata->data.stream_info.bits_per_sample,
+                                         metadata->data.stream_info.total_samples);
+        if (!meta_ok) {
+
+            MD__decoding_error_signal ();
+            FLAC__stream_decoder_finish (MDFLAC__decoder);
+            FLAC__stream_decoder_delete (MDFLAC__decoder);
+            MD__exit_decoder ();
+        }
+    }
 }
 
-void MDFLAC__error_callback (const FLAC__StreamDecoder          *decoder,
+void MDFLAC__error_callback (const FLAC__StreamDecoder          *MDFLAC__decoder,
                              FLAC__StreamDecoderErrorStatus     status,
                              void                               *client_data) {
 
-	(void)decoder, (void)client_data;
+	(void)MDFLAC__decoder, (void)client_data;
 
-    MD__decoding_error_signal();
+    MD__decoding_error_signal ();
 
 	printf("Got error callback: %s\n", FLAC__StreamDecoderErrorStatusString[status]);
 }
 
-static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__StreamDecoder     *decoder,
+static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__StreamDecoder     *MDFLAC__decoder,
                                                               const FLAC__Frame             *frame,
                                                               const FLAC__int32 *const      buffer[],
                                                               void                          *client_data) {
+
     MD__lock ();
-    for (unsigned int i = 0; i < frame->header.blocksize; i++)
-    {
-        for (int j=3; j>=0; j--)
-        {
+    for (unsigned int i = 0; i < frame->header.blocksize; i++) {
+
+        for (int j=MDFLAC__bps/8*MDFLAC__channels - 1; j>=0; j--) {
+
             unsigned int temp_buffer = buffer [j/2][i];
             if (j%2 == 0)
             {

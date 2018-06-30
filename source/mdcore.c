@@ -39,16 +39,18 @@ static ALCcontext       *MDAL__context;
 static ALuint           *MDAL__buffers;
 static ALuint           MDAL__source;
 
+void (*MD__metadata_fptr) (unsigned int, unsigned int, unsigned int, unsigned int) = NULL;
+
 int     MDAL__pop_error             (char *message, int code);
 ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
 void    MD__remove_buffer_head      ();
-
-void    (*MD__metadata_fptr)          (unsigned int, unsigned int, unsigned int, unsigned int) = NULL;
-
-void MD__play (char *filename,
-               void *decoder_func       (void *),
-               void (*metadata_handle)  (unsigned int, unsigned int,
-                                         unsigned int, unsigned int)) {
+void    MDAL__clear                 ();
+void    MD__play                    (char *filename,
+                                     void *decoder_func (void *),
+                                     void (*metadata_handle) (unsigned int,
+                                                              unsigned int,
+                                                              unsigned int,
+                                                              unsigned int)) {
 
     MD__metadata_fptr = metadata_handle;
 
@@ -98,6 +100,7 @@ void MD__play (char *filename,
 
                 initialized = false;
 
+                MDAL__clear ();
                 printf("Done playing.\n");
                 break;
             }
@@ -291,12 +294,15 @@ ALenum MDAL__get_format (unsigned int channels, unsigned int bps) {
     return format;
 }
 
-void MDAL__close () {
-
-    MDAL__device = alcGetContextsDevice (MDAL__context);
+void MDAL__clear () {
 
     alDeleteSources         (1, &MDAL__source);
     alDeleteBuffers         ((ALuint) MD__buff_num, MDAL__buffers);
+}
+
+void MDAL__close () {
+
+    MDAL__device = alcGetContextsDevice (MDAL__context);
 
     free(MDAL__buffers);
 
@@ -458,7 +464,7 @@ void MD__decoding_error_signal () {
     pthread_mutex_unlock (&MD__mutex);
 }
 
-void MD__set_metadata (unsigned int sample_rate,
+bool MD__set_metadata (unsigned int sample_rate,
                        unsigned int channels,
                        unsigned int bps,
                        unsigned int total_samples) {
@@ -475,11 +481,16 @@ void MD__set_metadata (unsigned int sample_rate,
     else {
 
         MD__decoding_error      = true;
+        pthread_mutex_unlock (&MD__mutex);
+
+        return false;
     }
 
     MD__metadata_fptr (sample_rate, channels, bps, total_samples);
 
     pthread_mutex_unlock (&MD__mutex);
+
+    return true;
 }
 
 void MD__exit_decoder() {
