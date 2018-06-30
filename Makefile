@@ -2,29 +2,30 @@ proj = melodeer
 objects = main.o mdcore.o mdflac.o mdwav.o
 libs = openal FLAC pthread
 
+srcdir = source
+builddir = build
+depsdir = include
+
 $(proj): $(objects)
-	gcc $^ $(addprefix  -l,$(libs)) -o $(proj)
+	gcc $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o $(proj)
 
-%.o : %.c %.h
-	gcc -c $< -o $@ -O3
+%.o : $(srcdir)/%.c $(depsdir)/%.h
+	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3
 
-main.o: main.c
-	gcc -c main.c -o main.o -O3
+main.o: $(srcdir)/main.c
+	-mkdir $(builddir)
+	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3
 
 .PHONY=clean
 clean:
-	-rm main.o mdcore.o mdflac.o mdwav.o $(proj)
-
-.PHONY=build
-build:
-	-make $(proj)
+	-rm $(builddir)/* $(proj)
 
 .PHONY=run
 run:
-	make build
+	make $(proj)
 	./$(proj)
 
 .PHONY=debug
 debug:
-	make build
+	make $(proj)
 	valgrind ./$(proj)
