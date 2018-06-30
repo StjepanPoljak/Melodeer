@@ -1,17 +1,12 @@
-proj=melodeer
-compile=gcc main.o mdcore.o mdflac.o mdwav.o -l openal -l FLAC -pthread -o $(proj)
+proj = melodeer
+objects = main.o mdcore.o mdflac.o mdwav.o
+libs = openal FLAC pthread
 
-$(proj): main.o mdcore.o mdflac.o mdwav.o
-	$(compile)
+$(proj): $(objects)
+	gcc $^ $(addprefix  -l,$(libs)) -o $(proj)
 
-mdwav.o: mdwav.c mdwav.h
-	gcc -c mdwav.c -o mdwav.o -O3
-
-mdflac.o: mdflac.c mdflac.h
-	gcc -c mdflac.c -o mdflac.o -O3
-
-mdcore.o: mdcore.c mdcore.h
-	gcc -c mdcore.c -o mdcore.o -O3
+%.o : %.c %.h
+	gcc -c $< -o $@ -O3
 
 main.o: main.c
 	gcc -c main.c -o main.o -O3

@@ -1,19 +1,20 @@
 #include "mdcore.h"
 
-struct MDBufferChunk {
+struct MD__buffer_chunk {
 
-    unsigned char           *chunk;
-    unsigned int            size;
-    unsigned int            order;
-    struct MDBufferChunk    *next;
+    unsigned char               *chunk;
+    unsigned int                size;
+    unsigned int                order;
+    struct MD__buffer_chunk     *next;
 
-} MDBufferChunkInit = { NULL, 0, 0, NULL };
+} MD__buffer_chunk_init = { NULL, 0, 0, NULL };
 
-typedef struct          MDBufferChunk MDBufferChunk;
+typedef struct          MD__buffer_chunk MD__buffer_chunk;
+typedef struct          MD__metadata MD__metadata;
 
-static volatile         MDBufferChunk *volatile MD__first_chunk;
-static volatile         MDBufferChunk *volatile MD__current_chunk;
-static volatile         MDBufferChunk *volatile MD__last_chunk;
+static volatile         MD__buffer_chunk *volatile MD__first_chunk;
+static volatile         MD__buffer_chunk *volatile MD__current_chunk;
+static volatile         MD__buffer_chunk *volatile MD__last_chunk;
 
 pthread_mutex_t         MD__mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -42,8 +43,15 @@ int     MDAL__pop_error             (char *message, int code);
 ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
 void    MD__remove_buffer_head      ();
 
-void MD__play(char *filename, void *decoder_func(void *))
-{
+void    (*MD__metadata_fptr)          (unsigned int, unsigned int, unsigned int, unsigned int) = NULL;
+
+void MD__play (char *filename,
+               void *decoder_func       (void *),
+               void (*metadata_handle)  (unsigned int, unsigned int,
+                                         unsigned int, unsigned int)) {
+
+    MD__metadata_fptr = metadata_handle;
+
     pthread_t decoder_thread;
 
     if (pthread_create (&decoder_thread, NULL, decoder_func, (void *)filename))
@@ -165,7 +173,7 @@ void MD__play(char *filename, void *decoder_func(void *))
             continue;
         }
 
-        pthread_mutex_lock(&MD__mutex);
+        pthread_mutex_lock (&MD__mutex);
 
         // if not initialized, but all buffers are loaded with first chunks
         if ((MD__last_chunk != NULL && MD__last_chunk->order >= MD__buff_num)
@@ -246,7 +254,6 @@ void MDAL__initialize()
 
     alGenBuffers((ALuint)MD__buff_num, MDAL__buffers);
     MDAL__pop_error("Error creating buffer.", 5);
-
 }
 
 int MDAL__pop_error (char *message, int code)
@@ -258,8 +265,8 @@ int MDAL__pop_error (char *message, int code)
     if (error != AL_NO_ERROR)
     {
         MDAL__close ();
-        printf("Error: %s\n", message);
-        exit(code);
+        printf ("OpenAL error: %s\n", message);
+        exit (code);
     }
 }
 
@@ -325,7 +332,7 @@ void MD__clear_buffer()
 {
     while (MD__current_chunk != NULL) {
 
-        volatile MDBufferChunk * volatile to_be_freed = MD__current_chunk;
+        volatile MD__buffer_chunk * volatile to_be_freed = MD__current_chunk;
         MD__current_chunk = MD__current_chunk->next;
 
         free (to_be_freed->chunk);
@@ -344,7 +351,7 @@ void MD__remove_buffer_head () {
         return;
     }
 
-    volatile MDBufferChunk *old_first = MD__first_chunk;
+    volatile MD__buffer_chunk *old_first = MD__first_chunk;
 
     if (MD__first_chunk == MD__last_chunk) {
 
@@ -376,7 +383,7 @@ void MD__add_to_buffer_raw (unsigned char data) {
     }
     else
     {
-        MDBufferChunk *new_chunk = malloc (sizeof (MDBufferChunk));
+        MD__buffer_chunk *new_chunk = malloc (sizeof (MD__buffer_chunk));
         new_chunk->chunk = malloc (sizeof (unsigned char) * MD__buff_size);
         new_chunk->size = 0;
         new_chunk->order = 0;
@@ -399,7 +406,7 @@ void MD__add_to_buffer_raw (unsigned char data) {
 
 void MD__add_buffer_chunk_ncp (unsigned char* data, unsigned int size)
 {
-    MDBufferChunk *new_chunk = malloc (sizeof (MDBufferChunk));
+    MD__buffer_chunk *new_chunk = malloc (sizeof (MD__buffer_chunk));
     new_chunk->chunk = data;
     new_chunk->next = NULL;
     new_chunk->size = size;
@@ -453,12 +460,12 @@ void MD__decoding_error_signal () {
 
 void MD__set_metadata (unsigned int sample_rate,
                        unsigned int channels,
-                       unsigned int bps) {
+                       unsigned int bps,
+                       unsigned int total_samples) {
 
     pthread_mutex_lock (&MD__mutex);
     MD__sample_rate         = sample_rate;
     MD__channels            = channels;
-
     MD__format              = MDAL__get_format (channels, bps);
 
     if (MD__format) {
@@ -469,6 +476,9 @@ void MD__set_metadata (unsigned int sample_rate,
 
         MD__decoding_error      = true;
     }
+
+    MD__metadata_fptr (sample_rate, channels, bps, total_samples);
+
     pthread_mutex_unlock (&MD__mutex);
 }
 

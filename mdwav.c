@@ -121,8 +121,6 @@ void *MDWAV__parse (void *filename)
 
     printf (" | bps:             %d\n", bits);
 
-    MD__set_metadata (frequency, channels, bits);
-
     // if there is offset to data marker, skip it
     if (fmtlen >= 16) {
 
@@ -148,6 +146,8 @@ void *MDWAV__parse (void *filename)
                            | buffer [2] << 16
                            | buffer [1] << 8
                            | buffer [0];
+
+    MD__set_metadata (frequency, channels, bits, (data_size / channels * 8) / bits);
 
     unsigned char *metatemp = buffer;
     unsigned int done_processing = 0;

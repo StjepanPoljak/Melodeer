@@ -11,6 +11,11 @@ typedef enum MD__filetype MD__filetype;
 
 MD__filetype MD__get_extension (const char *filename);
 
+void MD__handle_metadata (unsigned int sample_rate,
+                          unsigned int channels,
+                          unsigned int bps,
+                          unsigned int total_samples);
+
 int main (int argc, char *argv[])
 {
     MD__initialize ();
@@ -23,12 +28,10 @@ int main (int argc, char *argv[])
     switch (type) {
 
         case MD__FLAC:
-            printf("Playing flac.\n");
             decoder = MDFLAC__start_decoding;
             break;
 
         case MD__WAV:
-            printf("Playing wav.\n");
             decoder = MDWAV__parse;
             break;
 
@@ -39,7 +42,7 @@ int main (int argc, char *argv[])
 
     if (decoder == NULL) exit (1);
 
-    MD__play (argv[1], decoder);
+    MD__play (argv[1], decoder, MD__handle_metadata);
 
     MDAL__close ();
 
@@ -68,10 +71,10 @@ MD__filetype MD__get_extension (const char *filename) {
 
     if (diff == 5) {
 
-        if (filename[last_dot_position] == 'f'
-        && filename[last_dot_position + 1] == 'l'
-        && filename[last_dot_position + 2] == 'a'
-        && filename[last_dot_position + 3] == 'c') {
+        if (filename [last_dot_position]     == 'f'
+         && filename [last_dot_position + 1] == 'l'
+         && filename [last_dot_position + 2] == 'a'
+         && filename [last_dot_position + 3] == 'c') {
 
             return MD__FLAC;
         }
@@ -79,14 +82,42 @@ MD__filetype MD__get_extension (const char *filename) {
 
     if (diff == 4) {
 
-        if (filename[last_dot_position] == 'w'
-        && filename[last_dot_position + 1] == 'a'
-        && filename[last_dot_position + 2] == 'v') {
+        if (filename [last_dot_position]     == 'w'
+         && filename [last_dot_position + 1] == 'a'
+         && filename [last_dot_position + 2] == 'v') {
 
             return MD__WAV;
         }
     }
 
     return MD__UNKNOWN;
+}
 
+void MD__handle_metadata (unsigned int sample_rate,
+                          unsigned int channels,
+                          unsigned int bps,
+                          unsigned int total_samples) {
+
+    unsigned int total_seconds  = total_samples / sample_rate;
+    unsigned int hours          = total_seconds / 3600;
+    unsigned int minutes        = (total_seconds / 60) - (hours * 60);
+    unsigned int seconds        = total_seconds - 60 * minutes;
+
+    unsigned int data_size      = total_samples * (bps / 8) * channels;
+    float kb                    = data_size / 1024;
+    float mb                    = kb / 1024;
+    bool data_test              = mb >= 1.0;
+
+    printf("\n");
+    printf(" | sample rate      : %d Hz\n", sample_rate);
+    printf(" | channels         : %s\n", (channels == 2) ? "Stereo" : "Mono");
+    printf(" | quality          : %d bps\n", bps);
+    printf(" | data size        : %.2f %s\n", data_test ? mb : kb, data_test ? "Mb" : "Kb");
+    printf(" | duration         : ");
+    if (hours > 0)      printf("%dh ", hours);
+    if (minutes > 0)    printf("%dm ", minutes);
+    if (seconds > 0)    printf ("%ds", seconds);
+    printf("\n");
+
+    printf("\n");
 }

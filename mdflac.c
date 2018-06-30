@@ -52,7 +52,8 @@ void MDFLAC__metadata_callback (const FLAC__StreamDecoder   *decoder,
 
         MD__set_metadata (metadata->data.stream_info.sample_rate,
                           metadata->data.stream_info.channels,
-                          metadata->data.stream_info.bits_per_sample);
+                          metadata->data.stream_info.bits_per_sample,
+                          metadata->data.stream_info.total_samples);
 	}
 }
 
