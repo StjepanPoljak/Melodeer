@@ -96,7 +96,7 @@ void MD__play (char *filename, void *decoder_func (void *),
                 continue;
             }
 
-            if (MD__last_chunk->order > MD__pre_buff - 1) {
+            if (MD__last_chunk->order > MD__pre_buff - 1 || MD__decoding_done) {
 
                 MD__current_chunk = MD__first_chunk;
                 pthread_mutex_unlock (&MD__mutex);
