@@ -41,8 +41,6 @@ void *MDWAV__parse (void *filename)
               | buffer [1] << 8
               | buffer [0];
 
-    printf ("File size: %d (%.2f mb)\n\n", fsize, (float)fsize/(1024*1024));
-
     // 9-12 WAVE
     fread (buffer, 1, 4, f);
 
@@ -71,8 +69,6 @@ void *MDWAV__parse (void *filename)
                         | buffer [1] << 8
                         | buffer [0];
 
-    printf ("Fmt size: %d\n\n", fmtlen);
-
     // 21-22 format type ( 1 = PCM )
     fread (buffer, 1, 2, f);
     if (buffer[1] != 0
@@ -88,16 +84,12 @@ void *MDWAV__parse (void *filename)
     channels  = buffer [1] << 8
               | buffer [0];
 
-    printf (" | channels:        %d\n", channels);
-
     // 25-28 sample rate
     fread (buffer, 1, 4, f);
     frequency = buffer [3] << 24
               | buffer [2] << 16
               | buffer [1] << 8
               | buffer [0];
-
-    printf (" | sample rate:     %d\n", frequency);
 
     // 29-32 byte rate
     fread (buffer, 1, 4, f);
@@ -106,20 +98,16 @@ void *MDWAV__parse (void *filename)
                    | buffer [2] << 16
                    | buffer [1] << 8
                    | buffer [0];
-    printf (" | block size:      %d\n", block_size);
 
     // 33-34 block alignment
     fread (buffer, 1, 2, f);
     int block_align = buffer[1]<<8
                     | buffer[0];
-    printf(" | block align:     %d\n", block_align);
 
     // 35-36 bits per sample
     fread (buffer, 1, 2, f);
     bits = buffer [1] << 8
          | buffer [0];
-
-    printf (" | bps:             %d\n", bits);
 
     // if there is offset to data marker, skip it
     if (fmtlen >= 16) {

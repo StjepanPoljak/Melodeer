@@ -1,8 +1,6 @@
 #include "mdflac.h"
 #include "mdcore.h"
 
-unsigned int            MDFLAC__bps         = 0;
-unsigned int            MDFLAC__channels    = 0;
 FLAC__StreamDecoder     *MDFLAC__decoder    = 0;
 
 void *MDFLAC__start_decoding (void *filename)
@@ -55,9 +53,6 @@ void MDFLAC__metadata_callback (const FLAC__StreamDecoder   *decoder,
 
 	if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
 
-        MDFLAC__bps = metadata->data.stream_info.bits_per_sample;
-        MDFLAC__channels = metadata->data.stream_info.channels;
-
         bool meta_ok = MD__set_metadata (metadata->data.stream_info.sample_rate,
                                          metadata->data.stream_info.channels,
                                          metadata->data.stream_info.bits_per_sample,
@@ -87,18 +82,31 @@ static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__Stream
                                                               const FLAC__Frame             *frame,
                                                               const FLAC__int32 *const      buffer[],
                                                               void                          *client_data) {
+    unsigned int bps_supp = 16;
+
+    unsigned int bps_mult = ((frame->header.bits_per_sample < bps_supp) ? frame->header.bits_per_sample : bps_supp) / 8;
+
+    unsigned int compress = 0;
+
+    if (frame->header.bits_per_sample == 24) {
+
+        compress = 1;
+
+    } else if (frame->header.bits_per_sample == 32) {
+
+        compress = 2;
+    }
 
     MD__lock ();
     for (unsigned int i = 0; i < frame->header.blocksize; i++) {
 
-        for (int j=MDFLAC__bps/8*MDFLAC__channels - 1; j>=0; j--) {
+        for (int c = 0; c < frame->header.channels; c++) {
 
-            unsigned int temp_buffer = buffer [j/2][i];
-            if (j%2 == 0)
-            {
-                temp_buffer = temp_buffer>>8;
+            for (int b = 0; b < bps_mult; b++ ) {
+
+                MD__add_to_buffer_raw ((unsigned char)((buffer[c][i] >> (8 * compress))>>(8*b)));
             }
-            MD__add_to_buffer_raw ((unsigned char)temp_buffer);
+
         }
     }
     MD__unlock ();

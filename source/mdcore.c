@@ -85,7 +85,7 @@ void    MD__play                    (char *filename,
 
         if ((MD__is_playing && MD__current_chunk->next == NULL && MD__decoding_done)
         || MD__stop_playing || MD__decoding_error) {
-        pthread_mutex_unlock(&MD__mutex);
+        pthread_mutex_unlock (&MD__mutex);
 
             ALint val;
 
@@ -123,7 +123,9 @@ void    MD__play                    (char *filename,
 
                 alGetSourcei (MDAL__source, AL_BUFFERS_PROCESSED, &val);
 
-                if (val <= 0) continue;
+                if (val <= 0) {
+                    continue;
+                }
 
                 for(int i=0; i<val; i++) {
 
@@ -139,7 +141,6 @@ void    MD__play                    (char *filename,
 
                     pthread_mutex_lock (&MD__mutex);
                     if (MD__decoding_done && MD__current_chunk->next == NULL) {
-
                         pthread_mutex_unlock(&MD__mutex);
                         break;
                     }
@@ -163,7 +164,7 @@ void    MD__play                    (char *filename,
 
                     pthread_mutex_lock (&MD__mutex);
                     MD__is_playing = true;
-                    pthread_mutex_lock (&MD__mutex);
+                    pthread_mutex_unlock (&MD__mutex);
 
                     alSourcePlay (MDAL__source);
                 }
@@ -284,13 +285,14 @@ ALenum MDAL__get_format (unsigned int channels, unsigned int bps) {
         else if (channels == 2)
             format = AL_FORMAT_STEREO8;
     }
-    else if (bps == 16) {
+    else if (bps == 16 || bps == 24 || bps == 32) {
 
         if (channels == 1)
             format = AL_FORMAT_MONO16;
         else if (channels == 2)
             format = AL_FORMAT_STEREO16;
     }
+
     return format;
 }
 
@@ -317,7 +319,7 @@ void MD__initialize ()
     MD__current_chunk   = NULL;
     MD__last_chunk      = NULL;
 
-    MD__buff_size       = 4096;
+    MD__buff_size       = 8192;
     MD__buff_num        = 3;
 
     MD__sample_rate     = 0;
