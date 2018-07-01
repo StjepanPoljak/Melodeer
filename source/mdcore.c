@@ -40,6 +40,7 @@ static ALCcontext       *MDAL__context;
 static ALuint           *MDAL__buffers;
 static ALuint           MDAL__source;
 
+void    MDAL__buff_init             ();
 int     MDAL__pop_error             (char *message, int code);
 ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
 void    MD__remove_buffer_head      ();
@@ -113,6 +114,8 @@ void MD__play (char *filename, void *decoder_func (void *),
         pthread_exit (NULL);
     }
     pthread_mutex_unlock (&MD__mutex);
+
+    MDAL__buff_init ();
 
     for(int i=0; i<MD__buff_num; i++) {
 
@@ -236,11 +239,20 @@ void MD__play (char *filename, void *decoder_func (void *),
     pthread_join (decoder_thread, NULL);
 }
 
+void MDAL__buff_init () {
 
-void MDAL__initialize()
+    MDAL__buffers = malloc (sizeof (ALuint) * MD__buff_num);
+
+    alGenSources((ALuint)1, &MDAL__source);
+    MDAL__pop_error("Error generating source.", 4);
+
+    alGenBuffers((ALuint)MD__buff_num, MDAL__buffers);
+    MDAL__pop_error("Error creating buffer.", 5);
+}
+
+
+void MDAL__initialize ()
 {
-    MDAL__buffers = malloc(sizeof(ALuint) * MD__buff_num);
-
     MDAL__device = alcOpenDevice(NULL);
 
     if (!MDAL__device)
@@ -256,12 +268,6 @@ void MDAL__initialize()
         printf("Error creating context.");
         exit(2);
     }
-
-    alGenSources((ALuint)1, &MDAL__source);
-    MDAL__pop_error("Error generating source.", 4);
-
-    alGenBuffers((ALuint)MD__buff_num, MDAL__buffers);
-    MDAL__pop_error("Error creating buffer.", 5);
 }
 
 int MDAL__pop_error (char *message, int code)

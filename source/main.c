@@ -40,9 +40,10 @@ int main (int argc, char *argv[])
             break;
     }
 
-    if (decoder == NULL) exit (1);
+    if (decoder != NULL) {
 
-    MD__play (argv[1], decoder, MD__handle_metadata);
+        MD__play (argv[1], decoder, MD__handle_metadata);
+    }
 
     MDAL__close ();
 
