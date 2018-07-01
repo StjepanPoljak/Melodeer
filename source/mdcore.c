@@ -20,6 +20,7 @@ pthread_mutex_t         MD__mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static unsigned int     MD__buff_size;
 static unsigned int     MD__buff_num;
+static unsigned int     MD__pre_buff;
 
 static unsigned         MD__sample_rate;
 static unsigned         MD__channels;
@@ -39,18 +40,18 @@ static ALCcontext       *MDAL__context;
 static ALuint           *MDAL__buffers;
 static ALuint           MDAL__source;
 
-void (*MD__metadata_fptr) (unsigned int, unsigned int, unsigned int, unsigned int) = NULL;
-
 int     MDAL__pop_error             (char *message, int code);
 ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
 void    MD__remove_buffer_head      ();
 void    MDAL__clear                 ();
-void    MD__play                    (char *filename,
-                                     void *decoder_func (void *),
-                                     void (*metadata_handle) (unsigned int,
-                                                              unsigned int,
-                                                              unsigned int,
-                                                              unsigned int)) {
+
+void (*MD__metadata_fptr) (unsigned int, unsigned int, unsigned int, unsigned int) = NULL;
+
+void MD__play (char *filename, void *decoder_func (void *),
+               void (*metadata_handle) (unsigned int,
+                                        unsigned int,
+                                        unsigned int,
+                                        unsigned int)) {
 
     MD__metadata_fptr = metadata_handle;
 
@@ -63,21 +64,88 @@ void    MD__play                    (char *filename,
         exit (40);
     }
 
-    volatile bool initialized = false;
+    while (true) {
+
+        pthread_mutex_lock (&MD__mutex);
+        if (MD__metadata_loaded) {
+            pthread_mutex_unlock (&MD__mutex);
+            break;
+        }
+        pthread_mutex_unlock (&MD__mutex);
+    }
+
+    while (true) {
+
+        pthread_mutex_lock (&MD__mutex);
+        if (MD__decoding_error) {
+            pthread_mutex_unlock (&MD__mutex);
+            break;
+        }
+
+        if (MD__last_chunk != NULL) {
+
+            if (MD__pre_buff == 0) {
+                if (MD__decoding_done) {
+                    MD__current_chunk = MD__first_chunk;
+                    pthread_mutex_unlock (&MD__mutex);
+                    break;
+                }
+
+                pthread_mutex_unlock (&MD__mutex);
+                continue;
+            }
+
+            if (MD__last_chunk->order > MD__pre_buff - 1) {
+
+                MD__current_chunk = MD__first_chunk;
+                pthread_mutex_unlock (&MD__mutex);
+                break;
+            }
+        }
+        pthread_mutex_unlock (&MD__mutex);
+    }
+
+    pthread_mutex_lock (&MD__mutex);
+    if (MD__decoding_error) {
+        pthread_mutex_unlock (&MD__mutex);
+
+        pthread_join (decoder_thread, NULL);
+        pthread_exit (NULL);
+    }
+    pthread_mutex_unlock (&MD__mutex);
+
+    for(int i=0; i<MD__buff_num; i++) {
+
+        pthread_mutex_lock (&MD__mutex);
+        alBufferData (MDAL__buffers[i],
+                      MD__format,
+                      MD__current_chunk->chunk,
+                      MD__current_chunk->size,
+                      (ALuint) MD__sample_rate);
+
+        if (MD__current_chunk->next != NULL) {
+
+            MD__current_chunk = MD__current_chunk->next;
+        }
+        else if (MD__decoding_done) {
+            pthread_mutex_unlock (&MD__mutex);
+            break;
+        }
+        pthread_mutex_unlock (&MD__mutex);
+    }
+
+    alSourceQueueBuffers (MDAL__source, MD__buff_num, MDAL__buffers);
+    alSourcePlay (MDAL__source);
+
+    printf("Playing...\n");
+
+    MD__is_playing = true;
 
     while (true)
     {
         pthread_mutex_lock(&MD__mutex);
-
-        // if not initialized, but we have a first chunk and a not-set current chunk
-        if (MD__current_chunk == NULL && !initialized && MD__first_chunk != NULL) {
-
-            MD__current_chunk = MD__first_chunk;
-        }
-
         // the && !MD__stop_playing, etc... is only to make signal fall through to if below
-        if ((MD__current_chunk == NULL || !MD__metadata_loaded)
-        && !MD__stop_playing && !MD__decoding_error) {
+        if (MD__current_chunk == NULL && !MD__stop_playing && !MD__decoding_error) {
 
             pthread_mutex_unlock (&MD__mutex);
             continue;
@@ -93,12 +161,9 @@ void    MD__play                    (char *filename,
 
             if (val != AL_PLAYING || MD__stop_playing) {
 
-                pthread_mutex_lock (&MD__mutex);
+                // we shouldn't need locks here anymore
                 MD__clear_buffer();
                 MD__initialize ();
-                pthread_mutex_unlock (&MD__mutex);
-
-                initialized = false;
 
                 MDAL__clear ();
                 printf("Done playing.\n");
@@ -107,126 +172,65 @@ void    MD__play                    (char *filename,
 
             continue;
         }
+
+        if (MD__current_chunk->next == NULL) {
+            pthread_mutex_unlock (&MD__mutex);
+
+            continue;
+        }
         pthread_mutex_unlock (&MD__mutex);
 
-        if (initialized)
-        {
-            pthread_mutex_lock (&MD__mutex);
+        ALuint buffer;
+        ALint val;
 
-            if ((MD__current_chunk != NULL && MD__current_chunk->next != NULL)
-            || (MD__decoding_done && MD__current_chunk != NULL))
-            {
-                pthread_mutex_unlock (&MD__mutex);
+        alGetSourcei (MDAL__source, AL_BUFFERS_PROCESSED, &val);
 
-                ALuint buffer;
-                ALint val;
-
-                alGetSourcei (MDAL__source, AL_BUFFERS_PROCESSED, &val);
-
-                if (val <= 0) {
-                    continue;
-                }
-
-                for(int i=0; i<val; i++) {
-
-                    alSourceUnqueueBuffers (MDAL__source, 1, &buffer);
-
-                    pthread_mutex_lock (&MD__mutex);
-                    alBufferData (buffer, MD__format, MD__current_chunk->chunk,
-                                  MD__current_chunk->size, (ALuint) MD__sample_rate);
-                    pthread_mutex_unlock (&MD__mutex);
-
-                    alSourceQueueBuffers (MDAL__source, 1, &buffer);
-                    MDAL__pop_error ("Error (un)queuing MDAL__buffers.", 22);
-
-                    pthread_mutex_lock (&MD__mutex);
-                    if (MD__decoding_done && MD__current_chunk->next == NULL) {
-                        pthread_mutex_unlock(&MD__mutex);
-                        break;
-                    }
-
-                    MD__current_chunk = MD__current_chunk->next;
-                    pthread_mutex_unlock (&MD__mutex);
-
-                    MD__remove_buffer_head ();
-                }
-
-                pthread_mutex_lock (&MD__mutex);
-                if (MD__decoding_done && MD__current_chunk->next == NULL) {
-
-                    pthread_mutex_unlock (&MD__mutex);
-                    continue;
-                }
-                pthread_mutex_unlock (&MD__mutex);
-
-                alGetSourcei (MDAL__source, AL_SOURCE_STATE, &val);
-                if(val != AL_PLAYING) {
-
-                    pthread_mutex_lock (&MD__mutex);
-                    MD__is_playing = true;
-                    pthread_mutex_unlock (&MD__mutex);
-
-                    alSourcePlay (MDAL__source);
-                }
-            }
-            else {
-
-                pthread_mutex_unlock (&MD__mutex);
-            }
+        if (val <= 0 && MD__is_playing) {
 
             continue;
         }
 
-        pthread_mutex_lock (&MD__mutex);
+        for(int i=0; i<val; i++) {
 
-        // if not initialized, but all buffers are loaded with first chunks
-        if ((MD__last_chunk != NULL && MD__last_chunk->order >= MD__buff_num)
-        || MD__decoding_done) {
-
-            printf ("Chunks preloaded: %d\n", MD__last_chunk->order);
-
-            pthread_mutex_unlock (&MD__mutex);
-
-            for(int i=0; i<MD__buff_num; i++)
-            {
-                pthread_mutex_lock (&MD__mutex);
-                alBufferData (MDAL__buffers[i],
-                              MD__format,
-                              MD__current_chunk->chunk,
-                              MD__current_chunk->size,
-                              (ALuint)MD__sample_rate);
-
-                if (MD__current_chunk->next != NULL) {
-
-                    MD__current_chunk = MD__current_chunk->next;
-                }
-                else if (MD__decoding_done) {
-                    pthread_mutex_unlock (&MD__mutex);
-
-                    break;
-                }
-                pthread_mutex_unlock (&MD__mutex);
-            }
-
-            alSourceQueueBuffers (MDAL__source, MD__buff_num, MDAL__buffers);
-            alSourcePlay (MDAL__source);
-
-            printf("Playing...\n");
+            alSourceUnqueueBuffers (MDAL__source, 1, &buffer);
 
             pthread_mutex_lock (&MD__mutex);
-            MD__is_playing = true;
+            if (MD__is_playing)
+            alBufferData (buffer, MD__format, MD__current_chunk->chunk,
+                          MD__current_chunk->size, (ALuint) MD__sample_rate);
+            MDAL__pop_error ("Error saving buffer data.", 22);
+            pthread_mutex_unlock (&MD__mutex);
 
-            if (MD__current_chunk->next == NULL && MD__decoding_done) {
+            alSourceQueueBuffers (MDAL__source, 1, &buffer);
+            MDAL__pop_error ("Error (un)queuing MDAL__buffers.", 22);
 
-                pthread_mutex_unlock(&MD__mutex);
-                continue;
+            pthread_mutex_lock (&MD__mutex);
+            if (MD__decoding_done && MD__current_chunk->next == NULL) {
+                pthread_mutex_unlock (&MD__mutex);
+                break;
             }
-            pthread_mutex_unlock(&MD__mutex);
 
-            initialized = true;
+            MD__current_chunk = MD__current_chunk->next;
+            pthread_mutex_unlock (&MD__mutex);
+
+            MD__remove_buffer_head ();
         }
 
-        pthread_mutex_unlock(&MD__mutex);
+        pthread_mutex_lock (&MD__mutex);
+        if (MD__decoding_done && MD__current_chunk->next == NULL) {
+
+            pthread_mutex_unlock (&MD__mutex);
+            continue;
+        }
+        pthread_mutex_unlock (&MD__mutex);
+
+        alGetSourcei (MDAL__source, AL_SOURCE_STATE, &val);
+        if(val != AL_PLAYING) {
+
+            MD__is_playing = true;
+
+            alSourcePlay (MDAL__source);
+        }
     }
 
     pthread_join (decoder_thread, NULL);
@@ -321,6 +325,7 @@ void MD__initialize ()
 
     MD__buff_size       = 8192;
     MD__buff_num        = 3;
+    MD__pre_buff        = 3;
 
     MD__sample_rate     = 0;
     MD__channels        = 0;
