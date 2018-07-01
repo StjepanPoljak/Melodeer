@@ -4,8 +4,9 @@
 #include "mdcore.h"
 #include "mdflac.h"
 #include "mdwav.h"
+#include "mdlame.h"
 
-enum MD__filetype { MD__FLAC, MD__WAV, MD__UNKNOWN };
+enum MD__filetype { MD__FLAC, MD__WAV, MD__MP3, MD__UNKNOWN };
 
 typedef enum MD__filetype MD__filetype;
 
@@ -35,8 +36,12 @@ int main (int argc, char *argv[])
             decoder = MDWAV__parse;
             break;
 
+        case MD__MP3:
+            decoder = MDLAME__decoder;
+            break;
+
         default:
-            printf("Unknown file type.\n");
+            printf ("Unknown file type.\n");
             break;
     }
 
@@ -47,7 +52,7 @@ int main (int argc, char *argv[])
 
     MDAL__close ();
 
-    exit(0);
+    return 0;
 }
 
 MD__filetype MD__get_extension (const char *filename) {
@@ -88,6 +93,13 @@ MD__filetype MD__get_extension (const char *filename) {
          && filename [last_dot_position + 2] == 'v') {
 
             return MD__WAV;
+        }
+
+        if (filename [last_dot_position]     == 'm'
+         && filename [last_dot_position + 1] == 'p'
+         && filename [last_dot_position + 2] == '3') {
+
+            return MD__MP3;
         }
     }
 

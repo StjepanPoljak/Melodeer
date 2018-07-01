@@ -74,7 +74,7 @@ void MD__play (char *filename, void *decoder_func (void *),
         }
         pthread_mutex_unlock (&MD__mutex);
     }
-
+    
     while (true) {
 
         pthread_mutex_lock (&MD__mutex);
@@ -111,7 +111,6 @@ void MD__play (char *filename, void *decoder_func (void *),
         pthread_mutex_unlock (&MD__mutex);
 
         pthread_join (decoder_thread, NULL);
-        pthread_exit (NULL);
     }
     pthread_mutex_unlock (&MD__mutex);
 
@@ -228,6 +227,7 @@ void MD__play (char *filename, void *decoder_func (void *),
         pthread_mutex_unlock (&MD__mutex);
 
         alGetSourcei (MDAL__source, AL_SOURCE_STATE, &val);
+
         if(val != AL_PLAYING) {
 
             MD__is_playing = true;
@@ -237,6 +237,7 @@ void MD__play (char *filename, void *decoder_func (void *),
     }
 
     pthread_join (decoder_thread, NULL);
+
 }
 
 void MDAL__buff_init () {
@@ -290,17 +291,25 @@ ALenum MDAL__get_format (unsigned int channels, unsigned int bps) {
 
     if (bps == 8) {
 
-        if (channels == 1)
+        if (channels == 1) {
+
             format = AL_FORMAT_MONO8;
-        else if (channels == 2)
+
+        } else if (channels == 2) {
+
             format = AL_FORMAT_STEREO8;
+        }
     }
     else if (bps == 16 || bps == 24 || bps == 32) {
 
-        if (channels == 1)
+        if (channels == 1) {
+
             format = AL_FORMAT_MONO16;
-        else if (channels == 2)
+
+        } else if (channels == 2) {
+
             format = AL_FORMAT_STEREO16;
+        }
     }
 
     return format;
