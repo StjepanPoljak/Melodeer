@@ -1,4 +1,4 @@
-# melodeer
+# Melodeer
 Humble audio player based on OpenAL.
 
 Melodeer is envisioned as a high-level cross-platform API dedicated to, not only playing, but also compressing and enabling further processing (e.g. with FFT) of audio files in lossless format (WAV and FLAC). There is also simple support for mp3 files (and may include more). It is still in development, and anybody willing to contribute is welcome to join in the fun.
