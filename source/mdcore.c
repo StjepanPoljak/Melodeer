@@ -74,7 +74,7 @@ void MD__play (char *filename, void *decoder_func (void *),
         }
         pthread_mutex_unlock (&MD__mutex);
     }
-    
+
     while (true) {
 
         pthread_mutex_lock (&MD__mutex);
@@ -185,6 +185,15 @@ void MD__play (char *filename, void *decoder_func (void *),
         ALuint buffer;
         ALint val;
 
+        alGetSourcei (MDAL__source, AL_SOURCE_STATE, &val);
+
+        if(val != AL_PLAYING) {
+
+            printf("Buffer underrun.\n");
+
+            alSourcePlay (MDAL__source);
+        }
+
         alGetSourcei (MDAL__source, AL_BUFFERS_PROCESSED, &val);
 
         if (val <= 0 && MD__is_playing) {
@@ -197,7 +206,6 @@ void MD__play (char *filename, void *decoder_func (void *),
             alSourceUnqueueBuffers (MDAL__source, 1, &buffer);
 
             pthread_mutex_lock (&MD__mutex);
-            if (MD__is_playing)
             alBufferData (buffer, MD__format, MD__current_chunk->chunk,
                           MD__current_chunk->size, (ALuint) MD__sample_rate);
             MDAL__pop_error ("Error saving buffer data.", 22);
@@ -226,14 +234,7 @@ void MD__play (char *filename, void *decoder_func (void *),
         }
         pthread_mutex_unlock (&MD__mutex);
 
-        alGetSourcei (MDAL__source, AL_SOURCE_STATE, &val);
 
-        if(val != AL_PLAYING) {
-
-            MD__is_playing = true;
-
-            alSourcePlay (MDAL__source);
-        }
     }
 
     pthread_join (decoder_thread, NULL);

@@ -10,11 +10,11 @@ $(proj): $(objects)
 	gcc $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o $(proj)
 
 %.o : $(srcdir)/%.c $(depsdir)/%.h
-	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir)
+	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3
 
 main.o: $(srcdir)/main.c
 	-mkdir $(builddir)
-	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir)
+	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3
 
 .PHONY=clean
 clean:
