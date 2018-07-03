@@ -1,6 +1,8 @@
 #include "mdwav.h"
 #include "mdcore.h"
 
+bool MDWAV__compress = true;
+
 void MDWAV__error (char *message) {
 
     printf("Error: %s\n", message);
@@ -16,11 +18,18 @@ void *MDWAV__parse (void *filename)
 
     unsigned char *buffer;
     unsigned int buff_size = MD__get_buffer_size ();
-    FILE *f;
+    FILE *f = NULL;
 
     buffer = malloc (4);
 
     f = fopen ((char *) filename, "rb");
+
+    if (f == NULL) {
+
+        printf("Cannot open file.");
+        MD__decoding_error_signal ();
+        MD__exit_decoder ();
+    }
 
     // 1-4 RIFF
     fread (buffer, 1, 4, f);
@@ -144,13 +153,20 @@ void *MDWAV__parse (void *filename)
 
         if (done_processing >= data_size) break;
 
-        // this will be freed by the buffer algorithm, so no worries
-        buffer = malloc (buff_size);
+        if (bits <= 16 || !MDWAV__compress) {
+            // this will be freed by the buffer algorithm, so no worries
+            buffer = malloc (buff_size);
 
-        unsigned int read_size = fread (buffer, 1, buff_size, f);
+            unsigned int read_size = fread (buffer, 1, buff_size, f);
 
-        MD__add_buffer_chunk_ncp (buffer, read_size);
-        done_processing += read_size;
+            MD__add_buffer_chunk_ncp (buffer, read_size);
+            done_processing += read_size;
+
+        } else {
+
+        // TODO: compression for > 16bps
+
+        }
     }
 
     fclose (f);

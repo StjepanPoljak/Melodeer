@@ -1,7 +1,7 @@
 #include "mdflac.h"
 #include "mdcore.h"
 
-FLAC__StreamDecoder     *MDFLAC__decoder    = 0;
+FLAC__StreamDecoder *MDFLAC__decoder = 0;
 
 void *MDFLAC__start_decoding (void *filename)
 {
@@ -84,7 +84,9 @@ static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__Stream
                                                               void                          *client_data) {
     unsigned int bps_supp = 16;
 
-    unsigned int bps_mult = ((frame->header.bits_per_sample < bps_supp) ? frame->header.bits_per_sample : bps_supp) / 8;
+    unsigned int bps_mult = ((frame->header.bits_per_sample < bps_supp)
+                          ? frame->header.bits_per_sample
+                          : bps_supp) / 8;
 
     unsigned int compress = 0;
 
@@ -104,9 +106,10 @@ static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__Stream
 
             for (int b = 0; b < bps_mult; b++ ) {
 
-                MD__add_to_buffer_raw ((unsigned char)((buffer[c][i] >> (8 * compress))>>(8*b)));
+                MD__add_to_buffer_raw ((unsigned char)((buffer [c] [i]
+                                                        >> (8 * compress))
+                                                        >> (8 * b)));
             }
-
         }
     }
     MD__unlock ();

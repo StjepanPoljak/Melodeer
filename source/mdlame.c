@@ -13,13 +13,17 @@ void *MDLAME__decoder (void *filename)
 
     FILE *mp3fp = fopen ((char *) filename, "r");
 
+    if (mp3fp == NULL) {
+
+        printf("Cannot open file.");
+        MD__decoding_error_signal ();
+        MD__exit_decoder ();
+    }
+
     unsigned char *mp3buffer = malloc (buff_size);
 
-    short *pcm_l = malloc (buff_size * 100);    // this is horrible, but the best
-    short *pcm_r = malloc (buff_size * 100);    // solution I could find on the net
-                                                // (so far) - working only with
-                                                // 4096 ... I really don't like mp3,
-                                                // so if anybody wants support, DIY
+    short *pcm_l = malloc (buff_size * 100);    // temporary solution - flac
+    short *pcm_r = malloc (buff_size * 100);    // and wav are more important
 
     mp3data_struct* mp3data = malloc (sizeof (mp3data_struct));
 
@@ -48,9 +52,9 @@ void *MDLAME__decoder (void *filename)
             for (int i=0; i<mp3ret; i++) {
                 // would have to check if this is the right order
                 MD__add_to_buffer (pcm_l[i]);
-                MD__add_to_buffer (pcm_l[i]>>8);
+                MD__add_to_buffer (pcm_l[i] >> 8);
                 MD__add_to_buffer (pcm_r[i]);
-                MD__add_to_buffer (pcm_r[i]>>8);
+                MD__add_to_buffer (pcm_r[i] >> 8);
             }
         }
     }

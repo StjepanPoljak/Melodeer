@@ -54,6 +54,12 @@ void MD__play (char *filename, void *decoder_func (void *),
                                         unsigned int,
                                         unsigned int)) {
 
+    if ( access( filename, F_OK | R_OK ) == -1 ) {
+
+        printf ("Can't open file.\n");
+        return;
+    }
+
     MD__metadata_fptr = metadata_handle;
 
     pthread_t decoder_thread;
@@ -68,6 +74,13 @@ void MD__play (char *filename, void *decoder_func (void *),
     while (true) {
 
         pthread_mutex_lock (&MD__mutex);
+        if (MD__decoding_error) {
+
+            printf("Decoding error.");
+            pthread_mutex_unlock (&MD__mutex);
+            return;
+        }
+
         if (MD__metadata_loaded) {
             pthread_mutex_unlock (&MD__mutex);
             break;
