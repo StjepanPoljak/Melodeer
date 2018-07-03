@@ -99,20 +99,20 @@ static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__Stream
         compress = 2;
     }
 
-    MD__lock ();
     for (unsigned int i = 0; i < frame->header.blocksize; i++) {
 
         for (int c = 0; c < frame->header.channels; c++) {
 
             for (int b = 0; b < bps_mult; b++ ) {
-
+                MD__lock ();
                 MD__add_to_buffer_raw ((unsigned char)((buffer [c] [i]
                                                         >> (8 * compress))
                                                         >> (8 * b)));
+
+                MD__unlock ();
             }
         }
     }
-    MD__unlock ();
 
     return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
 }

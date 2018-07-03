@@ -17,6 +17,11 @@ void MD__handle_metadata (unsigned int sample_rate,
                           unsigned int bps,
                           unsigned int total_samples);
 
+void transform (volatile MD__buffer_chunk *curr_chunk,
+                unsigned int sample_rate,
+                unsigned int channels,
+                unsigned int bps);
+
 int main (int argc, char *argv[])
 {
     MD__initialize ();
@@ -45,9 +50,14 @@ int main (int argc, char *argv[])
             break;
     }
 
+    //MD__buffer_transform = transform;
+
     if (decoder != NULL) {
 
-        MD__play (argv[1], decoder, MD__handle_metadata);
+        for (int i=1; i<argc; i++) {
+
+            MD__play (argv[i], decoder, MD__handle_metadata);
+        }
     }
 
     MDAL__close ();
@@ -133,4 +143,31 @@ void MD__handle_metadata (unsigned int sample_rate,
     printf("\n");
 
     printf("\n");
+}
+
+void transform (volatile MD__buffer_chunk *curr_chunk,
+                unsigned int sample_rate,
+                unsigned int channels,
+                unsigned int bps) {
+
+    for (int i=0; i<curr_chunk->size/((bps/8)*channels); i++) {
+
+        for (int c=0; c<channels; c++) {
+
+            unsigned long data = 0;
+
+            for (int b=0; b<bps/8; b++) {
+
+                data = data + curr_chunk->chunk[i*channels*(bps/8)+(c*channels)+b];
+                data = data << 8;
+            }
+
+            // transform
+
+            for (int b=0; b<bps/8; b++) {
+
+                curr_chunk->chunk[i*channels*(bps/8)+(c*channels)+b] = data >> (b*8);
+            }
+        }
+    }
 }

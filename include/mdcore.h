@@ -9,6 +9,16 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
+struct MD__buffer_chunk {
+
+    unsigned char               *chunk;
+    unsigned int                size;
+    unsigned int                order;
+    struct MD__buffer_chunk     *next;
+};
+
+typedef struct MD__buffer_chunk MD__buffer_chunk;
+
 void    MD__add_to_buffer           (unsigned char data);
 void    MD__add_to_buffer_raw       (unsigned char data);
 void    MD__add_buffer_chunk_ncp    (unsigned char* data, unsigned int size);
@@ -38,3 +48,8 @@ void    MD__unlock                  ();
 
 unsigned int    MD__get_buffer_size         ();
 unsigned int    MD__get_buffer_num          ();
+
+void (*MD__buffer_transform) (volatile MD__buffer_chunk *curr_chunk,
+                              unsigned int sample_rate,
+                              unsigned int channels,
+                              unsigned int bps);
