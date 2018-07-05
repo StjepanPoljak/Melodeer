@@ -12,10 +12,11 @@ typedef enum MD__filetype MD__filetype;
 
 MD__filetype MD__get_extension (const char *filename);
 
-void MD__handle_metadata (unsigned int sample_rate,
-                          unsigned int channels,
-                          unsigned int bps,
-                          unsigned int total_samples);
+void MD__handle_metadata (MD__metadata metadata);
+unsigned int MD__get_seconds (volatile MD__buffer_chunk *curr_chunk,
+                              unsigned int sample_rate,
+                              unsigned int channels,
+                              unsigned int bps);
 
 void transform (volatile MD__buffer_chunk *curr_chunk,
                 unsigned int sample_rate,
@@ -24,7 +25,7 @@ void transform (volatile MD__buffer_chunk *curr_chunk,
 
 int main (int argc, char *argv[])
 {
-    MD__initialize ();
+    MD__initialize (4096, 4, 4);
     MDAL__initialize ();
 
     void *(* decoder)(void *) = NULL;
@@ -50,7 +51,7 @@ int main (int argc, char *argv[])
             break;
     }
 
-    //MD__buffer_transform = transform;
+    MD__buffer_transform = transform;
 
     if (decoder != NULL) {
 
@@ -116,25 +117,22 @@ MD__filetype MD__get_extension (const char *filename) {
     return MD__UNKNOWN;
 }
 
-void MD__handle_metadata (unsigned int sample_rate,
-                          unsigned int channels,
-                          unsigned int bps,
-                          unsigned int total_samples) {
+void MD__handle_metadata (MD__metadata metadata) {
 
-    unsigned int total_seconds  = total_samples / sample_rate;
+    unsigned int total_seconds  = metadata.total_samples / metadata.sample_rate;
     unsigned int hours          = total_seconds / 3600;
     unsigned int minutes        = (total_seconds / 60) - (hours * 60);
     unsigned int seconds        = total_seconds - 60 * minutes;
 
-    unsigned int data_size      = total_samples * (bps / 8) * channels;
+    unsigned int data_size      = metadata.total_samples * (metadata.bps / 8) * metadata.channels;
     float kb                    = data_size / 1024;
     float mb                    = kb / 1024;
     bool data_test              = mb >= 1.0;
 
     printf("\n");
-    printf(" | sample rate      : %d Hz\n", sample_rate);
-    printf(" | channels         : %s\n", (channels == 2) ? "Stereo" : "Mono");
-    printf(" | quality          : %d bps\n", bps);
+    printf(" | sample rate      : %d Hz\n", metadata.sample_rate);
+    printf(" | channels         : %s\n", (metadata.channels == 2) ? "Stereo" : "Mono");
+    printf(" | quality          : %d bps\n", metadata.bps);
     printf(" | data size        : %.2f %s\n", data_test ? mb : kb, data_test ? "Mb" : "Kb");
     printf(" | duration         : ");
     if (hours > 0)      printf("%dh ", hours);
@@ -170,4 +168,13 @@ void transform (volatile MD__buffer_chunk *curr_chunk,
             }
         }
     }
+}
+
+unsigned int MD__get_seconds (volatile MD__buffer_chunk *curr_chunk,
+                              unsigned int sample_rate,
+                              unsigned int channels,
+                              unsigned int bps) {
+
+    return (curr_chunk->order * curr_chunk->size / (bps * channels / 8)) / sample_rate;
+
 }
