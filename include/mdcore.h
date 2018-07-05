@@ -68,9 +68,7 @@ void    MD__add_to_buffer           (unsigned char data);
 void    MD__add_to_buffer_raw       (unsigned char data);
 void    MD__add_buffer_chunk_ncp    (unsigned char* data, unsigned int size);
 
-void    MD__initialize              (unsigned int buffer_size,
-                                     unsigned int buffer_num,
-                                     unsigned int pre_buffer);
+void    MD__initialize              ();
 void    MD__clear_buffer            ();
 void    MD__play                    (char *filename,
                                      void *decoder_func (void *),
@@ -85,7 +83,9 @@ bool    MD__set_metadata            (unsigned int sample_rate,
 
 void    MD__exit_decoder            ();
 
-void    MDAL__initialize            ();
+void    MDAL__initialize            (unsigned int buffer_size,
+                                     unsigned int buffer_num,
+                                     unsigned int pre_buffer);
 void    MDAL__close                 ();
 
 void    MD__lock                    ();

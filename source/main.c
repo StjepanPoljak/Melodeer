@@ -25,8 +25,8 @@ void transform (volatile MD__buffer_chunk *curr_chunk,
 
 int main (int argc, char *argv[])
 {
-    MD__initialize (4096, 4, 4);
-    MDAL__initialize ();
+
+    MDAL__initialize (4096, 4, 4);
 
     void *(* decoder)(void *) = NULL;
 
@@ -56,7 +56,7 @@ int main (int argc, char *argv[])
     if (decoder != NULL) {
 
         for (int i=1; i<argc; i++) {
-
+            printf("%d",i);
             MD__play (argv[i], decoder, MD__handle_metadata);
         }
     }
@@ -152,19 +152,19 @@ void transform (volatile MD__buffer_chunk *curr_chunk,
 
         for (int c=0; c<channels; c++) {
 
-            unsigned long data = 0;
+            // this will depend on bps...
+            short data = 0;
 
             for (int b=0; b<bps/8; b++) {
 
-                data = data + curr_chunk->chunk[i*channels*(bps/8)+(c*channels)+b];
-                data = data << 8;
+                data = data + ((short)(curr_chunk->chunk[i*channels*(bps/8)+(c*channels)+b])<<(8*b));
             }
 
             // transform
 
             for (int b=0; b<bps/8; b++) {
 
-                curr_chunk->chunk[i*channels*(bps/8)+(c*channels)+b] = data >> (b*8);
+                curr_chunk->chunk[i*channels*(bps/8)+(c*channels)+b] = data >> 8*b;
             }
         }
     }
