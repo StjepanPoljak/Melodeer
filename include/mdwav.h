@@ -1,1 +1,1 @@
-void *MDWAV__parse (void *filename);
+void *MDWAV__parse (void *MD__file);

@@ -1,6 +1,6 @@
 #include "FLAC/stream_decoder.h"
 
-void *MDFLAC__start_decoding (void *filename);
+void *MDFLAC__start_decoding (void *MD__file);
 
 static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__StreamDecoder     *decoder,
                                                               const FLAC__Frame             *frame,

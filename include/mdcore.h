@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <sys/stat.h>
 
 #include <pthread.h>
 
@@ -41,6 +40,7 @@ struct MD__general {
 struct MD__file {
 
     char *filename;
+    FILE *file;
 
     volatile MD__buffer_chunk *MD__first_chunk;
     volatile MD__buffer_chunk *MD__current_chunk;
@@ -64,35 +64,37 @@ struct MD__file {
 typedef struct MD__file MD__file_t;
 typedef struct MD__general MD__general_t;
 
-void    MD__add_to_buffer           (unsigned char data);
-void    MD__add_to_buffer_raw       (unsigned char data);
-void    MD__add_buffer_chunk_ncp    (unsigned char* data, unsigned int size);
+void    MD__add_to_buffer           (MD__file_t *MD__file, unsigned char data);
+void    MD__add_to_buffer_raw       (MD__file_t *MD__file, unsigned char data);
+void    MD__add_buffer_chunk_ncp    (MD__file_t *MD__file, unsigned char* data, unsigned int size);
 
-void    MD__initialize              ();
-void    MD__clear_buffer            ();
-void    MD__play                    (char *filename,
+bool    MD__initialize              (MD__file_t *MD__file, char *filename);
+void    MD__clear_buffer            (MD__file_t *MD__file);
+void    MD__play                    (MD__file_t *MD__file,
                                      void *decoder_func (void *),
                                      void (*metadata_handle) (MD__metadata metadata));
 
-void    MD__decoding_done_signal    ();
-void    MD__decoding_error_signal   ();
-bool    MD__set_metadata            (unsigned int sample_rate,
+void    MD__decoding_done_signal    (MD__file_t *MD__file);
+void    MD__decoding_error_signal   (MD__file_t *MD__file);
+bool    MD__set_metadata            (MD__file_t *MD__file,
+                                     unsigned int sample_rate,
                                      unsigned int channels,
                                      unsigned int bps,
                                      unsigned int total_samples);
 
 void    MD__exit_decoder            ();
+void    MD__deinit                  (MD__file_t *MD__file);
 
 void    MDAL__initialize            (unsigned int buffer_size,
                                      unsigned int buffer_num,
                                      unsigned int pre_buffer);
 void    MDAL__close                 ();
 
-void    MD__lock                    ();
-void    MD__unlock                  ();
+void    MD__lock                    (MD__file_t *MD__file);
+void    MD__unlock                  (MD__file_t *MD__file);
 
-unsigned int    MD__get_buffer_size         ();
-unsigned int    MD__get_buffer_num          ();
+unsigned int    MD__get_buffer_size         (MD__file_t *MD__file);
+unsigned int    MD__get_buffer_num          (MD__file_t *MD__file);
 
 void (*MD__buffer_transform) (volatile MD__buffer_chunk *curr_chunk,
                               unsigned int sample_rate,

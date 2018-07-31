@@ -1,13 +1,12 @@
 #include "mdcore.h"
 
 MD__general_t MD__general;
-MD__file_t *MD__file = NULL;
 
-void    MDAL__buff_init             ();
+void    MDAL__buff_init             (MD__file_t *MD__file);
 int     MDAL__pop_error             (char *message, int code);
 ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
-void    MD__remove_buffer_head      ();
-void    MDAL__clear                 ();
+void    MD__remove_buffer_head      (MD__file_t *MD__file);
+void    MDAL__clear                 (MD__file_t *MD__file);
 
 void (*MD__metadata_fptr)       (MD__metadata) = NULL;
 void (*MD__buffer_transform)    (volatile MD__buffer_chunk *,
@@ -15,21 +14,15 @@ void (*MD__buffer_transform)    (volatile MD__buffer_chunk *,
                                  unsigned int channels,
                                  unsigned int bps) = NULL;
 
-void MD__play (char *filename, void *decoder_func (void *),
+void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
                void (*metadata_handle) (MD__metadata)) {
 
-    MD__file = (MD__file_t *)malloc (sizeof (MD__file_t));
-
-    MD__initialize ();
+    if (MD__file == NULL) {
+        printf("File not initialized.\n");
+        exit(40);
+    }
 
     pthread_mutex_init(&MD__file->MD__mutex, NULL);
-
-    struct stat attr_buff;
-    if (stat( filename, &attr_buff ) == -1) {
-
-        printf ("Can't open file.\n");
-        return;
-    }
 
     if ((MD__general.MD__pre_buff < MD__general.MD__buff_num) && (MD__general.MD__pre_buff != 0)) {
 
@@ -41,11 +34,11 @@ void MD__play (char *filename, void *decoder_func (void *),
 
     pthread_t decoder_thread;
 
-    if (pthread_create (&decoder_thread, NULL, decoder_func, (void *)filename))
+    if (pthread_create (&decoder_thread, NULL, decoder_func, (void *)MD__file))
     {
         MDAL__close();
         printf ("Error creating thread.\n");
-        exit (40);
+        exit (41);
     }
 
     while (true) {
@@ -105,7 +98,7 @@ void MD__play (char *filename, void *decoder_func (void *),
     }
     pthread_mutex_unlock (&MD__file->MD__mutex);
 
-    MDAL__buff_init ();
+    MDAL__buff_init (MD__file);
 
     for(int i=0; i<MD__general.MD__buff_num; i++) {
 
@@ -143,6 +136,7 @@ void MD__play (char *filename, void *decoder_func (void *),
 
     while (true)
     {
+
         pthread_mutex_lock(&MD__file->MD__mutex);
         // the && !MD__file->MD__stop_playing, etc... is only to make signal fall through to if below
         if ((MD__file->MD__current_chunk->next == NULL && MD__file->MD__decoding_done)
@@ -170,7 +164,6 @@ void MD__play (char *filename, void *decoder_func (void *),
         }
 
         for(int i=0; i<val; i++) {
-
             alSourceUnqueueBuffers (MD__file->MDAL__source, 1, &buffer);
 
             pthread_mutex_lock (&MD__file->MD__mutex);
@@ -198,7 +191,7 @@ void MD__play (char *filename, void *decoder_func (void *),
             MD__file->MD__current_chunk = MD__file->MD__current_chunk->next;
             pthread_mutex_unlock (&MD__file->MD__mutex);
 
-            MD__remove_buffer_head ();
+            MD__remove_buffer_head (MD__file);
         }
     }
 
@@ -207,18 +200,16 @@ void MD__play (char *filename, void *decoder_func (void *),
         alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
     }
 
-    MD__clear_buffer();
-    MD__initialize (MD__general.MD__buff_size, MD__general.MD__buff_num, MD__general.MD__pre_buff);
+    MD__clear_buffer(MD__file);
 
-    MDAL__clear ();
+    MDAL__clear (MD__file);
     printf("Done playing.\n");
-    free(MD__file);
 
     pthread_join (decoder_thread, NULL);
 
 }
 
-void MDAL__buff_init () {
+void MDAL__buff_init (MD__file_t *MD__file) {
 
     MD__file->MDAL__buffers = malloc (sizeof (ALuint) * MD__general.MD__buff_num);
 
@@ -298,24 +289,31 @@ ALenum MDAL__get_format (unsigned int channels, unsigned int bps) {
     return format;
 }
 
-void MDAL__clear () {
+void MDAL__clear (MD__file_t *MD__file) {
 
     alDeleteSources         (1, &MD__file->MDAL__source);
     alDeleteBuffers         ((ALuint) MD__general.MD__buff_num, MD__file->MDAL__buffers);
+
+    free(MD__file->MDAL__buffers);
 }
 
 void MDAL__close () {
 
     MD__general.MDAL__device = alcGetContextsDevice (MD__general.MDAL__context);
-
-    free(MD__file->MDAL__buffers);
-
     alcMakeContextCurrent   (NULL);
     alcDestroyContext       (MD__general.MDAL__context);
     alcCloseDevice          (MD__general.MDAL__device);
 }
 
-void MD__initialize () {
+bool MD__initialize (MD__file_t *MD__file, char *filename) {
+
+    MD__file->filename = filename;
+    MD__file->file = fopen(filename,"rb");
+
+    if (MD__file->file == NULL) {
+        printf(" (!) Could not open file %s\n", filename);
+        return false;
+    }
 
     MD__file->MD__first_chunk     = NULL;
     MD__file->MD__current_chunk   = NULL;
@@ -332,9 +330,11 @@ void MD__initialize () {
 
     MD__file->MD__stop_playing    = false;
     MD__file->MD__pause_playing   = false;
+
+    return true;
 }
 
-void MD__clear_buffer()
+void MD__clear_buffer(MD__file_t *MD__file)
 {
     while (MD__file->MD__current_chunk != NULL) {
 
@@ -347,7 +347,7 @@ void MD__clear_buffer()
 }
 
 
-void MD__remove_buffer_head () {
+void MD__remove_buffer_head (MD__file_t *MD__file) {
 
     pthread_mutex_lock (&MD__file->MD__mutex);
 
@@ -374,14 +374,14 @@ void MD__remove_buffer_head () {
     return;
 }
 
-void MD__add_to_buffer (unsigned char data) {
+void MD__add_to_buffer (MD__file_t *MD__file, unsigned char data) {
 
     pthread_mutex_lock (&MD__file->MD__mutex);
-    MD__add_to_buffer_raw (data);
+    MD__add_to_buffer_raw (MD__file, data);
     pthread_mutex_unlock (&MD__file->MD__mutex);
 }
 
-void MD__add_to_buffer_raw (unsigned char data) {
+void MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
 
     if ((MD__file->MD__last_chunk != NULL) && (MD__file->MD__last_chunk->size < MD__general.MD__buff_size)) {
 
@@ -410,7 +410,7 @@ void MD__add_to_buffer_raw (unsigned char data) {
     }
 }
 
-void MD__add_buffer_chunk_ncp (unsigned char* data, unsigned int size)
+void MD__add_buffer_chunk_ncp (MD__file_t *MD__file, unsigned char* data, unsigned int size)
 {
     MD__buffer_chunk *new_chunk = malloc (sizeof (MD__buffer_chunk));
     new_chunk->chunk = data;
@@ -432,7 +432,7 @@ void MD__add_buffer_chunk_ncp (unsigned char* data, unsigned int size)
 }
 
 
-unsigned int MD__get_buffer_size () {
+unsigned int MD__get_buffer_size (MD__file_t *MD__file) {
 
     pthread_mutex_lock (&MD__file->MD__mutex);
     unsigned int buff_temp_size = MD__general.MD__buff_size;
@@ -441,7 +441,7 @@ unsigned int MD__get_buffer_size () {
     return buff_temp_size;
 }
 
-unsigned int MD__get_buffer_num () {
+unsigned int MD__get_buffer_num (MD__file_t *MD__file) {
 
     pthread_mutex_lock (&MD__file->MD__mutex);
     unsigned int buff_temp_num = MD__general.MD__buff_num;
@@ -450,21 +450,22 @@ unsigned int MD__get_buffer_num () {
     return buff_temp_num;
 }
 
-void MD__decoding_done_signal () {
+void MD__decoding_done_signal (MD__file_t *MD__file) {
 
     pthread_mutex_lock (&MD__file->MD__mutex);
     MD__file->MD__decoding_done = true;
     pthread_mutex_unlock (&MD__file->MD__mutex);
 }
 
-void MD__decoding_error_signal () {
+void MD__decoding_error_signal (MD__file_t *MD__file) {
 
     pthread_mutex_lock (&MD__file->MD__mutex);
     MD__file->MD__stop_playing = true;
     pthread_mutex_unlock (&MD__file->MD__mutex);
 }
 
-bool MD__set_metadata (unsigned int sample_rate,
+bool MD__set_metadata (MD__file_t *MD__file,
+                       unsigned int sample_rate,
                        unsigned int channels,
                        unsigned int bps,
                        unsigned int total_samples) {
@@ -500,12 +501,12 @@ void MD__exit_decoder() {
     pthread_exit (NULL);
 }
 
-void MD__lock () {
+void MD__lock (MD__file_t *MD__file) {
 
     pthread_mutex_lock (&MD__file->MD__mutex);
 }
 
-void MD__unlock () {
+void MD__unlock (MD__file_t *MD__file) {
 
     pthread_mutex_unlock (&MD__file->MD__mutex);
 }
