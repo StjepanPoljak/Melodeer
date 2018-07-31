@@ -55,7 +55,7 @@ void *MDLAME__decoder (void *MD__file)
     free (pcm_r);
     free (mp3buffer);
 
-    fclose((MD__file_t *)MD__file->file);
+    fclose(((MD__file_t *)MD__file)->file);
 
     MD__decoding_done_signal ((MD__file_t *)MD__file);
 
