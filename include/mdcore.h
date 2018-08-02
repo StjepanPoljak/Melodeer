@@ -1,9 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>
 
+#ifdef _WIN32
+#include <windows.h>
+typedef LPVOID MD__ARGTYPE;
+typedef DWORD WINAPI MD__RETTYPE;
+#endif
+
+#ifdef linux
 #include <pthread.h>
+typedef void * MD__ARGTYPE;
+typedef void * MD__RETTYPE;
+#endif
 
 #include <AL/al.h>
 #include <AL/alc.h>
@@ -46,7 +55,13 @@ struct MD__file {
     volatile MD__buffer_chunk *MD__current_chunk;
     volatile MD__buffer_chunk *MD__last_chunk;
 
+#ifdef linux
     pthread_mutex_t     MD__mutex;
+#endif
+
+#ifdef _WIN32
+    HANDLE              MD__mutex;
+#endif
 
     MD__metadata            MD__metadata;
 
@@ -71,7 +86,7 @@ void    MD__add_buffer_chunk_ncp    (MD__file_t *MD__file, unsigned char* data, 
 bool    MD__initialize              (MD__file_t *MD__file, char *filename);
 void    MD__clear_buffer            (MD__file_t *MD__file);
 void    MD__play                    (MD__file_t *MD__file,
-                                     void *decoder_func (void *),
+                                     MD__RETTYPE decoder_func (MD__ARGTYPE),
                                      void (*metadata_handle) (MD__metadata metadata));
 
 void    MD__decoding_done_signal    (MD__file_t *MD__file);

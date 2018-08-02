@@ -25,7 +25,6 @@ void transform (volatile MD__buffer_chunk *curr_chunk,
 
 int main (int argc, char *argv[])
 {
-
     MDAL__initialize (4096, 4, 4);
 
     void *(* decoder)(void *) = NULL;

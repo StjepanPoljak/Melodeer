@@ -14,15 +14,13 @@ void (*MD__buffer_transform)    (volatile MD__buffer_chunk *,
                                  unsigned int channels,
                                  unsigned int bps) = NULL;
 
-void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
+void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
                void (*metadata_handle) (MD__metadata)) {
 
     if (MD__file == NULL) {
         printf("File not initialized.\n");
         exit(40);
     }
-
-    pthread_mutex_init(&MD__file->MD__mutex, NULL);
 
     if ((MD__general.MD__pre_buff < MD__general.MD__buff_num) && (MD__general.MD__pre_buff != 0)) {
 
@@ -32,6 +30,9 @@ void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
 
     MD__metadata_fptr = metadata_handle;
 
+#ifdef linux
+    pthread_mutex_init (&MD__file->MD__mutex, NULL);
+
     pthread_t decoder_thread;
 
     if (pthread_create (&decoder_thread, NULL, decoder_func, (void *)MD__file))
@@ -40,28 +41,46 @@ void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
         printf ("Error creating thread.\n");
         exit (41);
     }
+#endif
+
+#ifdef _WIN32
+    MD__file->MD__mutex = CreateMutex (NULL, FALSE, NULL);
+
+    DWORD WINAPI decoder_w32wrapper (LPVOID arg) {
+        decoder_func((void *)arg);
+        return 0;
+    }
+
+    HANDLE decoder_thread = CreateThread (NULL, 0, decoder_w32wrapper, (LPVOID) MD__file, 0, NULL);
+
+    if (!decoder_thread) {
+        MDAL__close();
+        printf("Error creating thread.\n");
+        exit(41);
+    }
+#endif
 
     while (true) {
 
-        pthread_mutex_lock (&MD__file->MD__mutex);
+        MD__lock (MD__file);
         if (MD__file->MD__stop_playing) {
 
-            pthread_mutex_unlock (&MD__file->MD__mutex);
+            MD__unlock (MD__file);
             return;
         }
 
         if (MD__file->MD__metadata_loaded) {
-            pthread_mutex_unlock (&MD__file->MD__mutex);
+            MD__unlock (MD__file);
             break;
         }
-        pthread_mutex_unlock (&MD__file->MD__mutex);
+        MD__unlock (MD__file);
     }
 
     while (true) {
 
-        pthread_mutex_lock (&MD__file->MD__mutex);
+        MD__lock (MD__file);
         if (MD__file->MD__stop_playing) {
-            pthread_mutex_unlock (&MD__file->MD__mutex);
+            MD__unlock (MD__file);
             break;
         }
 
@@ -72,37 +91,44 @@ void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
                 if (MD__file->MD__decoding_done) {
 
                     MD__file->MD__current_chunk = MD__file->MD__first_chunk;
-                    pthread_mutex_unlock (&MD__file->MD__mutex);
+                    MD__unlock (MD__file);
                     break;
                 }
 
-                pthread_mutex_unlock (&MD__file->MD__mutex);
+                MD__unlock (MD__file);
                 continue;
             }
 
             if (MD__file->MD__last_chunk->order > MD__general.MD__pre_buff - 1 || MD__file->MD__decoding_done) {
 
                 MD__file->MD__current_chunk = MD__file->MD__first_chunk;
-                pthread_mutex_unlock (&MD__file->MD__mutex);
+                MD__unlock (MD__file);
                 break;
             }
         }
-        pthread_mutex_unlock (&MD__file->MD__mutex);
+        MD__unlock (MD__file);
     }
 
-    pthread_mutex_lock (&MD__file->MD__mutex);
+    MD__lock (MD__file);
     if (MD__file->MD__stop_playing) {
-        pthread_mutex_unlock (&MD__file->MD__mutex);
+        MD__unlock (MD__file);
 
+#ifdef linux
         pthread_join (decoder_thread, NULL);
+#endif
+
+#ifdef _WIN32
+        WaitForSingleObject(decoder_thread, INFINITE);
+#endif
+
     }
-    pthread_mutex_unlock (&MD__file->MD__mutex);
+    MD__unlock (MD__file);
 
     MDAL__buff_init (MD__file);
 
     for(int i=0; i<MD__general.MD__buff_num; i++) {
 
-        pthread_mutex_lock (&MD__file->MD__mutex);
+        MD__lock (MD__file);
         if (MD__buffer_transform != NULL) {
 
             MD__buffer_transform (MD__file->MD__current_chunk,
@@ -119,10 +145,10 @@ void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
             MD__file->MD__current_chunk = MD__file->MD__current_chunk->next;
         }
         else if (MD__file->MD__decoding_done) {
-            pthread_mutex_unlock (&MD__file->MD__mutex);
+            MD__unlock (MD__file);
             break;
         }
-        pthread_mutex_unlock (&MD__file->MD__mutex);
+        MD__unlock (MD__file);
     }
 
     alSourceQueueBuffers (MD__file->MDAL__source, MD__general.MD__buff_num, MD__file->MDAL__buffers);
@@ -137,15 +163,15 @@ void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
     while (true)
     {
 
-        pthread_mutex_lock(&MD__file->MD__mutex);
+        MD__lock (MD__file);
         // the && !MD__file->MD__stop_playing, etc... is only to make signal fall through to if below
         if ((MD__file->MD__current_chunk->next == NULL && MD__file->MD__decoding_done)
         || MD__file->MD__stop_playing) {
 
-            pthread_mutex_unlock (&MD__file->MD__mutex);
+            MD__unlock (MD__file);
             break;
         }
-        pthread_mutex_unlock (&MD__file->MD__mutex);
+        MD__unlock (MD__file);
 
         alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
 
@@ -166,7 +192,7 @@ void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
         for(int i=0; i<val; i++) {
             alSourceUnqueueBuffers (MD__file->MDAL__source, 1, &buffer);
 
-            pthread_mutex_lock (&MD__file->MD__mutex);
+            MD__lock (MD__file);
             if (MD__buffer_transform != NULL) {
 
                 MD__buffer_transform (MD__file->MD__current_chunk,
@@ -176,20 +202,20 @@ void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
             }
             alBufferData (buffer, MD__file->MD__metadata.format, MD__file->MD__current_chunk->chunk,
                           MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
-            pthread_mutex_unlock (&MD__file->MD__mutex);
+            MD__unlock (MD__file);
             MDAL__pop_error ("Error saving buffer data.", 22);
 
             alSourceQueueBuffers (MD__file->MDAL__source, 1, &buffer);
             MDAL__pop_error ("Error (un)queuing MD__file->MDAL__buffers.", 23);
 
-            pthread_mutex_lock (&MD__file->MD__mutex);
+            MD__lock (MD__file);
             if (MD__file->MD__decoding_done && MD__file->MD__current_chunk->next == NULL) {
-                pthread_mutex_unlock (&MD__file->MD__mutex);
+                MD__unlock (MD__file);
                 break;
             }
 
             MD__file->MD__current_chunk = MD__file->MD__current_chunk->next;
-            pthread_mutex_unlock (&MD__file->MD__mutex);
+            MD__unlock (MD__file);
 
             MD__remove_buffer_head (MD__file);
         }
@@ -205,9 +231,17 @@ void MD__play (MD__file_t *MD__file, void *decoder_func (void *),
     MDAL__clear (MD__file);
     printf("Done playing.\n");
 
+
+#ifdef linux
     pthread_join (decoder_thread, NULL);
+#endif
+
+#ifdef _WIN32
+    WaitForSingleObject(decoder_thread, INFINITE);
+#endif
 
 }
+
 
 void MDAL__buff_init (MD__file_t *MD__file) {
 
@@ -349,11 +383,11 @@ void MD__clear_buffer(MD__file_t *MD__file)
 
 void MD__remove_buffer_head (MD__file_t *MD__file) {
 
-    pthread_mutex_lock (&MD__file->MD__mutex);
+    MD__lock (MD__file);
 
     if (MD__file->MD__first_chunk == NULL) {
 
-        pthread_mutex_unlock (&MD__file->MD__mutex);
+        MD__unlock (MD__file);
         return;
     }
 
@@ -366,7 +400,7 @@ void MD__remove_buffer_head (MD__file_t *MD__file) {
 
     MD__file->MD__first_chunk = MD__file->MD__first_chunk->next;
 
-    pthread_mutex_unlock (&MD__file->MD__mutex);
+    MD__unlock (MD__file);
 
     free (old_first->chunk);
     free ((void *)old_first);
@@ -376,9 +410,9 @@ void MD__remove_buffer_head (MD__file_t *MD__file) {
 
 void MD__add_to_buffer (MD__file_t *MD__file, unsigned char data) {
 
-    pthread_mutex_lock (&MD__file->MD__mutex);
+    MD__lock (MD__file);
     MD__add_to_buffer_raw (MD__file, data);
-    pthread_mutex_unlock (&MD__file->MD__mutex);
+    MD__unlock (MD__file);
 }
 
 void MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
@@ -434,34 +468,34 @@ void MD__add_buffer_chunk_ncp (MD__file_t *MD__file, unsigned char* data, unsign
 
 unsigned int MD__get_buffer_size (MD__file_t *MD__file) {
 
-    pthread_mutex_lock (&MD__file->MD__mutex);
+    MD__lock (MD__file);
     unsigned int buff_temp_size = MD__general.MD__buff_size;
-    pthread_mutex_unlock (&MD__file->MD__mutex);
+    MD__unlock (MD__file);
 
     return buff_temp_size;
 }
 
 unsigned int MD__get_buffer_num (MD__file_t *MD__file) {
 
-    pthread_mutex_lock (&MD__file->MD__mutex);
+    MD__lock (MD__file);
     unsigned int buff_temp_num = MD__general.MD__buff_num;
-    pthread_mutex_unlock (&MD__file->MD__mutex);
+    MD__unlock (MD__file);
 
     return buff_temp_num;
 }
 
 void MD__decoding_done_signal (MD__file_t *MD__file) {
 
-    pthread_mutex_lock (&MD__file->MD__mutex);
+    MD__lock (MD__file);
     MD__file->MD__decoding_done = true;
-    pthread_mutex_unlock (&MD__file->MD__mutex);
+    MD__unlock (MD__file);
 }
 
 void MD__decoding_error_signal (MD__file_t *MD__file) {
 
-    pthread_mutex_lock (&MD__file->MD__mutex);
+    MD__lock (MD__file);
     MD__file->MD__stop_playing = true;
-    pthread_mutex_unlock (&MD__file->MD__mutex);
+    MD__unlock (MD__file);
 }
 
 bool MD__set_metadata (MD__file_t *MD__file,
@@ -470,7 +504,7 @@ bool MD__set_metadata (MD__file_t *MD__file,
                        unsigned int bps,
                        unsigned int total_samples) {
 
-    pthread_mutex_lock (&MD__file->MD__mutex);
+    MD__lock (MD__file);
     MD__file->MD__metadata.sample_rate        = sample_rate;
     MD__file->MD__metadata.channels           = channels;
     MD__file->MD__metadata.bps                = bps;
@@ -484,29 +518,49 @@ bool MD__set_metadata (MD__file_t *MD__file,
     else {
 
         MD__file->MD__stop_playing        = true;
-        pthread_mutex_unlock (&MD__file->MD__mutex);
+        MD__unlock (MD__file);
 
         return false;
     }
 
     MD__metadata_fptr (MD__file->MD__metadata);
 
-    pthread_mutex_unlock (&MD__file->MD__mutex);
+    MD__unlock (MD__file);
 
     return true;
 }
 
 void MD__exit_decoder() {
 
+    #ifdef linux
     pthread_exit (NULL);
+    #endif
+
+    #ifdef _WIN32
+    _endthread ();
+    #endif
 }
 
 void MD__lock (MD__file_t *MD__file) {
 
+    #ifdef linux
     pthread_mutex_lock (&MD__file->MD__mutex);
+    #endif
+
+    #ifdef _WIN32
+    WaitForSingleObject (MD__file->MD__mutex, INFINITE);
+    #endif
+
 }
 
 void MD__unlock (MD__file_t *MD__file) {
 
+    #ifdef linux
     pthread_mutex_unlock (&MD__file->MD__mutex);
+    #endif
+
+    #ifdef _WIN32
+    ReleaseMutex (MD__file->MD__mutex);
+    #endif
+
 }
