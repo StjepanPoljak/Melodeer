@@ -85,9 +85,15 @@ void    MD__add_buffer_chunk_ncp    (MD__file_t *MD__file, unsigned char* data, 
 
 bool    MD__initialize              (MD__file_t *MD__file, char *filename);
 void    MD__clear_buffer            (MD__file_t *MD__file);
+
 void    MD__play                    (MD__file_t *MD__file,
                                      MD__RETTYPE decoder_func (MD__ARGTYPE),
-                                     void (*metadata_handle) (MD__metadata metadata));
+                                     void (*metadata_handle) (MD__metadata metadata),
+                                     void (*playing_handle) (void),
+                                     void (*error_handle) (char *info),
+                                     void (*completion) (void));
+
+void    MD__stop                     (MD__file_t *MD__file);
 
 void    MD__decoding_done_signal    (MD__file_t *MD__file);
 void    MD__decoding_error_signal   (MD__file_t *MD__file);

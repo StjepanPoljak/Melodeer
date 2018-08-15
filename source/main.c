@@ -23,6 +23,18 @@ void transform (volatile MD__buffer_chunk *curr_chunk,
                 unsigned int channels,
                 unsigned int bps);
 
+void MD__handle_errors (char *info);
+
+void MD__completion () {
+
+    printf("Done playing!\n");
+}
+
+void MD__playing_handle () {
+
+    printf("Playing!\n");
+}
+
 int main (int argc, char *argv[])
 {
     MDAL__initialize (4096, 4, 4);
@@ -60,7 +72,8 @@ int main (int argc, char *argv[])
                         break;
                     }
 
-                MD__play (&MD__file, decoder, MD__handle_metadata);
+                MD__play (&MD__file, decoder, MD__handle_metadata,
+                          MD__playing_handle, MD__handle_errors, MD__completion);
         }
     }
 
@@ -118,6 +131,10 @@ MD__filetype MD__get_extension (const char *filename) {
     }
 
     return MD__UNKNOWN;
+}
+
+void MD__handle_errors (char *info) {
+    printf("(!) %s\n",info);
 }
 
 void MD__handle_metadata (MD__metadata metadata) {

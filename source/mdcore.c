@@ -15,16 +15,17 @@ void (*MD__buffer_transform)    (volatile MD__buffer_chunk *,
                                  unsigned int bps) = NULL;
 
 void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
-               void (*metadata_handle) (MD__metadata)) {
+               void (*metadata_handle) (MD__metadata), void (*playing_handle)(),
+               void (*error_handle) (char *), void (*completion) (void)) {
 
     if (MD__file == NULL) {
-        printf("File not initialized.\n");
-        exit(40);
+        error_handle("File not initialized.");
+        return;
     }
 
     if ((MD__general.MD__pre_buff < MD__general.MD__buff_num) && (MD__general.MD__pre_buff != 0)) {
 
-        printf("Pre-buffer must be equal or larger than number of buffers.\n");
+        error_handle("Pre-buffer must be equal or larger than number of buffers.");
         return;
     }
 
@@ -38,8 +39,8 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     if (pthread_create (&decoder_thread, NULL, decoder_func, (void *)MD__file))
     {
         MDAL__close();
-        printf ("Error creating thread.\n");
-        exit (41);
+        error_handle ("Error creating thread.");
+        return;
     }
 #endif
 
@@ -54,8 +55,9 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     HANDLE decoder_thread = CreateThread (NULL, 0, decoder_w32wrapper, (LPVOID) MD__file, 0, NULL);
 
     if (!decoder_thread) {
-        MDAL__close();
-        printf("Error creating thread.\n");
+
+        MDAL__close ();
+        error_handle ("Error creating thread.");
         exit(41);
     }
 #endif
@@ -154,11 +156,13 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     alSourceQueueBuffers (MD__file->MDAL__source, MD__general.MD__buff_num, MD__file->MDAL__buffers);
     alSourcePlay (MD__file->MDAL__source);
 
-    printf("Playing...\n");
+    // error_handle ("Playing...");
+    MD__file->MD__is_playing = true;
+
+    playing_handle();
 
     ALuint buffer;
     ALint val;
-    MD__file->MD__is_playing = true;
 
     while (true)
     {
@@ -177,7 +181,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
         if(val != AL_PLAYING) {
 
-            printf("Buffer underrun.\n");
+            error_handle ("Buffer underrun.");
 
             alSourcePlay (MD__file->MDAL__source);
         }
@@ -221,15 +225,25 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         }
     }
 
-    while(val == AL_PLAYING) {
+    while (val == AL_PLAYING) {
 
-        alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
+        MD__lock (MD__file);
+        if (MD__file->MD__stop_playing) {
+
+        }
+        else {
+
+            alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
+        }
+        MD__unlock (MD__file);
     }
 
     MD__clear_buffer(MD__file);
 
     MDAL__clear (MD__file);
-    printf("Done playing.\n");
+
+    completion();
+    // error_handle ("Done playing.");
 
 
 #ifdef linux
@@ -242,6 +256,12 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
 }
 
+void MD__stop (MD__file_t *MD__file) {
+
+    MD__lock (MD__file);
+    MD__file->MD__stop_playing = true;
+    MD__unlock (MD__file);
+}
 
 void MDAL__buff_init (MD__file_t *MD__file) {
 
@@ -274,7 +294,7 @@ void MDAL__initialize (unsigned int buffer_size,
 
     if (!alcMakeContextCurrent(MD__general.MDAL__context))
     {
-        printf("Error creating context.");
+        printf("Error creating context.\n");
         exit(2);
     }
 }
@@ -345,7 +365,7 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
     MD__file->file = fopen(filename,"rb");
 
     if (MD__file->file == NULL) {
-        printf(" (!) Could not open file %s\n", filename);
+        // printf(" (!) Could not open file %s\n", filename);
         return false;
     }
 
