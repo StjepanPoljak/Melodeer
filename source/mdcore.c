@@ -197,6 +197,12 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             alSourceUnqueueBuffers (MD__file->MDAL__source, 1, &buffer);
 
             MD__lock (MD__file);
+
+            if (MD__file->MD__stop_playing) {
+                MD__unlock (MD__file);
+                break;
+            }
+
             if (MD__buffer_transform != NULL) {
 
                 MD__buffer_transform (MD__file->MD__current_chunk,
@@ -206,13 +212,11 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             }
             alBufferData (buffer, MD__file->MD__metadata.format, MD__file->MD__current_chunk->chunk,
                           MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
-            MD__unlock (MD__file);
             MDAL__pop_error ("Error saving buffer data.", 22);
 
             alSourceQueueBuffers (MD__file->MDAL__source, 1, &buffer);
             MDAL__pop_error ("Error (un)queuing MD__file->MDAL__buffers.", 23);
 
-            MD__lock (MD__file);
             if (MD__file->MD__decoding_done && MD__file->MD__current_chunk->next == NULL) {
                 MD__unlock (MD__file);
                 break;
@@ -222,14 +226,15 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             MD__unlock (MD__file);
 
             MD__remove_buffer_head (MD__file);
-        }
-    }
+        } // for
+    } // while
 
     while (val == AL_PLAYING) {
 
         MD__lock (MD__file);
         if (MD__file->MD__stop_playing) {
-
+            alSourceStop (MD__file->MDAL__source);
+            break;
         }
         else {
 
