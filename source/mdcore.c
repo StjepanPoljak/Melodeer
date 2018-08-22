@@ -234,6 +234,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         MD__lock (MD__file);
         if (MD__file->MD__stop_playing) {
             alSourceStop (MD__file->MDAL__source);
+            MD__unlock (MD__file);
             break;
         }
         else {
