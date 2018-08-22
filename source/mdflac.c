@@ -76,7 +76,7 @@ void MDFLAC__error_callback (const FLAC__StreamDecoder          *MDFLAC__decoder
 
     MD__decoding_error_signal ((MD__file_t *)client_data);
 
-	printf("Got error callback: %s\n", FLAC__StreamDecoderErrorStatusString[status]);
+	//printf("Got error callback: %s\n", FLAC__StreamDecoderErrorStatusString[status]);
 }
 
 static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__StreamDecoder     *MDFLAC__decoder,
@@ -104,7 +104,8 @@ static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__Stream
         MD__lock ((MD__file_t *)client_data);
 
         if (((MD__file_t *)client_data)->MD__stop_playing)
-        {    
+        {
+            MD__unlock ((MD__file_t *)client_data);
             return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
         }
 

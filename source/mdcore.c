@@ -65,12 +65,6 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     while (true) {
 
         MD__lock (MD__file);
-        if (MD__file->MD__stop_playing) {
-
-            MD__unlock (MD__file);
-            return;
-        }
-
         if (MD__file->MD__metadata_loaded) {
             MD__unlock (MD__file);
             break;
@@ -81,11 +75,6 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     while (true) {
 
         MD__lock (MD__file);
-        if (MD__file->MD__stop_playing) {
-            MD__unlock (MD__file);
-            break;
-        }
-
         if (MD__file->MD__last_chunk != NULL) {
 
             if (MD__general.MD__pre_buff == 0) {
@@ -110,21 +99,6 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         }
         MD__unlock (MD__file);
     }
-
-    MD__lock (MD__file);
-    if (MD__file->MD__stop_playing) {
-        MD__unlock (MD__file);
-
-#ifdef linux
-        pthread_join (decoder_thread, NULL);
-#endif
-
-#ifdef _WIN32
-        WaitForSingleObject(decoder_thread, INFINITE);
-#endif
-
-    }
-    MD__unlock (MD__file);
 
     MDAL__buff_init (MD__file);
 
@@ -168,10 +142,10 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     {
 
         MD__lock (MD__file);
+
         // the && !MD__file->MD__stop_playing, etc... is only to make signal fall through to if below
         if ((MD__file->MD__current_chunk->next == NULL && MD__file->MD__decoding_done)
         || MD__file->MD__stop_playing) {
-
             MD__unlock (MD__file);
             break;
         }
@@ -238,7 +212,6 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             break;
         }
         else {
-
             alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
         }
         MD__unlock (MD__file);
@@ -247,6 +220,8 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     MD__clear_buffer(MD__file);
 
     MDAL__clear (MD__file);
+
+MDLABEL__end:
 
     completion();
     // error_handle ("Done playing.");
@@ -426,10 +401,10 @@ void MD__remove_buffer_head (MD__file_t *MD__file) {
 
     MD__file->MD__first_chunk = MD__file->MD__first_chunk->next;
 
-    MD__unlock (MD__file);
-
     free (old_first->chunk);
     free ((void *)old_first);
+
+    MD__unlock (MD__file);
 
     return;
 }
