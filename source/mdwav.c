@@ -166,4 +166,6 @@ void *MDWAV__parse (void *MD__file)
 
     MD__decoding_done_signal ((MD__file_t *)MD__file);
     MD__exit_decoder ();
+
+    return NULL;
 }

@@ -62,4 +62,6 @@ void *MDLAME__decoder (void *MD__file)
     hip_decode_exit (MDLAME__gf);
 
     MD__exit_decoder ();
+
+    return NULL;
 }

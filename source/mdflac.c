@@ -42,6 +42,8 @@ void *MDFLAC__start_decoding (void *MD__file)
     }
 
     MD__exit_decoder();
+
+    return NULL;
 }
 
 

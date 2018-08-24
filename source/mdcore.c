@@ -31,7 +31,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     MD__metadata_fptr = metadata_handle;
 
-#ifdef linux
+#if defined(linux) || defined(__APPLE__)
     pthread_mutex_init (&MD__file->MD__mutex, NULL);
 
     pthread_t decoder_thread;
@@ -227,7 +227,7 @@ MDLABEL__end:
     // error_handle ("Done playing.");
 
 
-#ifdef linux
+#if defined(linux) || defined(__APPLE__)
     pthread_join (decoder_thread, NULL);
 #endif
 
@@ -292,6 +292,8 @@ int MDAL__pop_error (char *message, int code)
         printf ("OpenAL error: %s\n", message);
         exit (code);
     }
+
+    return code;
 }
 
 ALenum MDAL__get_format (unsigned int channels, unsigned int bps) {
@@ -533,7 +535,7 @@ bool MD__set_metadata (MD__file_t *MD__file,
 
 void MD__exit_decoder() {
 
-    #ifdef linux
+    #if defined(linux) || defined(__APPLE__)
     pthread_exit (NULL);
     #endif
 
@@ -544,7 +546,7 @@ void MD__exit_decoder() {
 
 void MD__lock (MD__file_t *MD__file) {
 
-    #ifdef linux
+    #if defined(linux) || defined(__APPLE__)
     pthread_mutex_lock (&MD__file->MD__mutex);
     #endif
 
@@ -556,7 +558,7 @@ void MD__lock (MD__file_t *MD__file) {
 
 void MD__unlock (MD__file_t *MD__file) {
 
-    #ifdef linux
+    #if defined(linux) || defined(__APPLE__)
     pthread_mutex_unlock (&MD__file->MD__mutex);
     #endif
 

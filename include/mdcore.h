@@ -8,7 +8,7 @@ typedef LPVOID MD__ARGTYPE;
 typedef DWORD WINAPI MD__RETTYPE;
 #endif
 
-#ifdef linux
+#if defined(linux) || defined(__APPLE__)
 #include <pthread.h>
 typedef void * MD__ARGTYPE;
 typedef void * MD__RETTYPE;
@@ -55,7 +55,7 @@ struct MD__file {
     volatile MD__buffer_chunk *MD__current_chunk;
     volatile MD__buffer_chunk *MD__last_chunk;
 
-#ifdef linux
+#if defined(linux) || defined(__APPLE__)
     pthread_mutex_t     MD__mutex;
 #endif
 
