@@ -103,14 +103,10 @@ static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__Stream
     }
 
     for (unsigned int i = 0; i < frame->header.blocksize; i++) {
+
+        if (MD__did_stop ((MD__file_t *) client_data)) return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+
         MD__lock ((MD__file_t *)client_data);
-
-        if (((MD__file_t *)client_data)->MD__stop_playing)
-        {
-            MD__unlock ((MD__file_t *)client_data);
-            return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-        }
-
         for (int c = 0; c < frame->header.channels; c++) {
 
             for (int b = 0; b < bps_mult; b++ ) {
@@ -119,7 +115,6 @@ static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__Stream
                                       (unsigned char)((buffer [c] [i]
                                                         >> (8 * compress))
                                                         >> (8 * b)));
-
             }
         }
         MD__unlock ((MD__file_t *)client_data);

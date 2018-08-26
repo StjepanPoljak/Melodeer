@@ -93,7 +93,8 @@ void    MD__play                    (MD__file_t *MD__file,
                                      void (*error_handle) (char *info),
                                      void (*completion) (void));
 
-void    MD__stop                     (MD__file_t *MD__file);
+void    MD__stop                    (MD__file_t *MD__file);
+bool    MD__did_stop                (MD__file_t *MD__file); 
 
 void    MD__decoding_done_signal    (MD__file_t *MD__file);
 void    MD__decoding_error_signal   (MD__file_t *MD__file);

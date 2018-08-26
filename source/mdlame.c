@@ -22,6 +22,8 @@ void *MDLAME__decoder (void *MD__file)
 
     while (!feof(((MD__file_t *)MD__file)->file)) {
 
+        if (MD__did_stop ((MD__file_t *)MD__file)) break;
+
         short mp3read_size = fread (mp3buffer, 1, buff_size, ((MD__file_t *)MD__file)->file);
         short mp3ret = hip_decode_headers (MDLAME__gf, mp3buffer,
                                            mp3read_size, pcm_l, pcm_r, mp3data);
@@ -51,9 +53,9 @@ void *MDLAME__decoder (void *MD__file)
         }
     }
 
-    free (pcm_l);
-    free (pcm_r);
-    free (mp3buffer);
+    if (pcm_l) free (pcm_l);
+    if (pcm_r) free (pcm_r);
+    if (mp3buffer) free (mp3buffer);
 
     fclose(((MD__file_t *)MD__file)->file);
 

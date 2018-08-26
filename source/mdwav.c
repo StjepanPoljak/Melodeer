@@ -143,7 +143,7 @@ void *MDWAV__parse (void *MD__file)
 
     while (true) {
 
-        if (done_processing >= data_size) break;
+        if (done_processing >= data_size || MD__did_stop ((MD__file_t *)MD__file)) break;
 
         if (bits <= 16 || !MDWAV__compress) {
             // this will be freed by the buffer algorithm, so no worries

@@ -244,6 +244,17 @@ void MD__stop (MD__file_t *MD__file) {
     MD__unlock (MD__file);
 }
 
+bool MD__did_stop (MD__file_t *MD__file) {
+
+    bool return_val = false;
+
+    MD__lock (MD__file);
+    return_val = MD__file->MD__stop_playing;
+    MD__unlock (MD__file);
+
+    return return_val;
+}
+
 void MDAL__buff_init (MD__file_t *MD__file) {
 
     MD__file->MDAL__buffers = malloc (sizeof (ALuint) * MD__general.MD__buff_num);
