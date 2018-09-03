@@ -14,6 +14,17 @@ void (*MD__buffer_transform)    (volatile MD__buffer_chunk *,
                                  unsigned int channels,
                                  unsigned int bps) = NULL;
 
+bool logging = true;
+
+void MD__log (char *string) {
+    FILE *f;
+    f = fopen("mdcore.log", "a");
+    if (f == NULL) return;
+    fprintf (f, string);
+    fprintf (f, "\n");
+    fclose (f);
+}
+
 void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
                void (*metadata_handle) (MD__metadata), void (*playing_handle)(),
                void (*error_handle) (char *), void (*completion) (void)) {
@@ -133,6 +144,8 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     // error_handle ("Playing...");
     MD__file->MD__is_playing = true;
 
+    MD__log("Playing.");
+
     playing_handle();
 
     ALuint buffer;
@@ -140,13 +153,13 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     while (true)
     {
-
         MD__lock (MD__file);
 
         // the && !MD__file->MD__stop_playing, etc... is only to make signal fall through to if below
         if ((MD__file->MD__current_chunk->next == NULL && MD__file->MD__decoding_done)
         || MD__file->MD__stop_playing) {
             MD__unlock (MD__file);
+
             break;
         }
         MD__unlock (MD__file);
@@ -174,6 +187,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
             if (MD__file->MD__stop_playing) {
                 MD__unlock (MD__file);
+
                 break;
             }
 
@@ -209,6 +223,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         if (MD__file->MD__stop_playing) {
             alSourceStop (MD__file->MDAL__source);
             MD__unlock (MD__file);
+
             break;
         }
         else {
@@ -221,11 +236,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     MDAL__clear (MD__file);
 
-MDLABEL__end:
-
     completion();
-    // error_handle ("Done playing.");
-
 
 #if defined(linux) || defined(__APPLE__)
     pthread_join (decoder_thread, NULL);
