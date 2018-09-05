@@ -8,8 +8,8 @@ ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
 void    MD__remove_buffer_head      (MD__file_t *MD__file);
 void    MDAL__clear                 (MD__file_t *MD__file);
 
-void (*MD__metadata_fptr)       (MD__metadata) = NULL;
-void (*MD__buffer_transform)    (volatile MD__buffer_chunk *,
+void (*MD__metadata_fptr)       (MD__metadata_t) = NULL;
+void (*MD__buffer_transform)    (volatile MD__buffer_chunk_t *,
                                  unsigned int sample_rate,
                                  unsigned int channels,
                                  unsigned int bps) = NULL;
@@ -26,7 +26,7 @@ void MD__log (char *string) {
 }
 
 void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
-               void (*metadata_handle) (MD__metadata), void (*playing_handle)(),
+               void (*metadata_handle) (MD__metadata_t), void (*playing_handle)(),
                void (*error_handle) (char *), void (*completion) (void)) {
 
     if (MD__file == NULL) {
@@ -397,7 +397,7 @@ void MD__clear_buffer(MD__file_t *MD__file)
 {
     while (MD__file->MD__current_chunk != NULL) {
 
-        volatile MD__buffer_chunk * volatile to_be_freed = MD__file->MD__current_chunk;
+        volatile MD__buffer_chunk_t * volatile to_be_freed = MD__file->MD__current_chunk;
         MD__file->MD__current_chunk = MD__file->MD__current_chunk->next;
 
         free (to_be_freed->chunk);
@@ -416,7 +416,7 @@ void MD__remove_buffer_head (MD__file_t *MD__file) {
         return;
     }
 
-    volatile MD__buffer_chunk *old_first = MD__file->MD__first_chunk;
+    volatile MD__buffer_chunk_t *old_first = MD__file->MD__first_chunk;
 
     if (MD__file->MD__first_chunk == MD__file->MD__last_chunk) {
 
@@ -448,7 +448,7 @@ void MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
     }
     else
     {
-        MD__buffer_chunk *new_chunk = malloc (sizeof (MD__buffer_chunk));
+        MD__buffer_chunk_t *new_chunk = malloc (sizeof (MD__buffer_chunk_t));
         new_chunk->chunk = malloc (sizeof (unsigned char) * MD__general.MD__buff_size);
         new_chunk->size = 0;
         new_chunk->order = 0;
@@ -471,7 +471,7 @@ void MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
 
 void MD__add_buffer_chunk_ncp (MD__file_t *MD__file, unsigned char* data, unsigned int size)
 {
-    MD__buffer_chunk *new_chunk = malloc (sizeof (MD__buffer_chunk));
+    MD__buffer_chunk_t *new_chunk = malloc (sizeof (MD__buffer_chunk_t));
     new_chunk->chunk = data;
     new_chunk->next = NULL;
     new_chunk->size = size;

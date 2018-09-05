@@ -12,13 +12,13 @@ typedef enum MD__filetype MD__filetype;
 
 MD__filetype MD__get_extension (const char *filename);
 
-void MD__handle_metadata (MD__metadata metadata);
-unsigned int MD__get_seconds (volatile MD__buffer_chunk *curr_chunk,
+void MD__handle_metadata (MD__metadata_t metadata);
+unsigned int MD__get_seconds (volatile MD__buffer_chunk_t *curr_chunk,
                               unsigned int sample_rate,
                               unsigned int channels,
                               unsigned int bps);
 
-void transform (volatile MD__buffer_chunk *curr_chunk,
+void transform (volatile MD__buffer_chunk_t *curr_chunk,
                 unsigned int sample_rate,
                 unsigned int channels,
                 unsigned int bps);
@@ -137,7 +137,7 @@ void MD__handle_errors (char *info) {
     printf("(!) %s\n",info);
 }
 
-void MD__handle_metadata (MD__metadata metadata) {
+void MD__handle_metadata (MD__metadata_t metadata) {
 
     unsigned int total_seconds  = metadata.total_samples / metadata.sample_rate;
     unsigned int hours          = total_seconds / 3600;
@@ -163,7 +163,7 @@ void MD__handle_metadata (MD__metadata metadata) {
     printf("\n");
 }
 
-void transform (volatile MD__buffer_chunk *curr_chunk,
+void transform (volatile MD__buffer_chunk_t *curr_chunk,
                 unsigned int sample_rate,
                 unsigned int channels,
                 unsigned int bps) {
@@ -190,7 +190,7 @@ void transform (volatile MD__buffer_chunk *curr_chunk,
     }
 }
 
-unsigned int MD__get_seconds (volatile MD__buffer_chunk *curr_chunk,
+unsigned int MD__get_seconds (volatile MD__buffer_chunk_t *curr_chunk,
                               unsigned int sample_rate,
                               unsigned int channels,
                               unsigned int bps) {

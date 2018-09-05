@@ -34,8 +34,8 @@ struct MD__metadata {
     unsigned int    format;
 };
 
-typedef struct      MD__buffer_chunk    MD__buffer_chunk;
-typedef struct      MD__metadata        MD__metadata;
+typedef struct      MD__buffer_chunk    MD__buffer_chunk_t;
+typedef struct      MD__metadata        MD__metadata_t;
 
 struct MD__general {
 
@@ -48,12 +48,12 @@ struct MD__general {
 
 struct MD__file {
 
-    char *filename;
-    FILE *file;
+    char        *filename;
+    FILE        *file;
 
-    volatile MD__buffer_chunk *MD__first_chunk;
-    volatile MD__buffer_chunk *MD__current_chunk;
-    volatile MD__buffer_chunk *MD__last_chunk;
+    volatile    MD__buffer_chunk_t     *MD__first_chunk;
+    volatile    MD__buffer_chunk_t     *MD__current_chunk;
+    volatile    MD__buffer_chunk_t     *MD__last_chunk;
 
 #if defined(linux) || defined(__APPLE__)
     pthread_mutex_t     MD__mutex;
@@ -63,7 +63,7 @@ struct MD__file {
     HANDLE              MD__mutex;
 #endif
 
-    MD__metadata            MD__metadata;
+    MD__metadata_t          MD__metadata;
 
     volatile bool           MD__metadata_loaded;
     volatile bool           MD__decoding_done;
@@ -88,7 +88,7 @@ void    MD__clear_buffer            (MD__file_t *MD__file);
 
 void    MD__play                    (MD__file_t *MD__file,
                                      MD__RETTYPE decoder_func (MD__ARGTYPE),
-                                     void (*metadata_handle) (MD__metadata metadata),
+                                     void (*metadata_handle) (MD__metadata_t metadata),
                                      void (*playing_handle) (void),
                                      void (*error_handle) (char *info),
                                      void (*completion) (void));
@@ -118,7 +118,7 @@ void    MD__unlock                  (MD__file_t *MD__file);
 unsigned int    MD__get_buffer_size         (MD__file_t *MD__file);
 unsigned int    MD__get_buffer_num          (MD__file_t *MD__file);
 
-void (*MD__buffer_transform) (volatile MD__buffer_chunk *curr_chunk,
+void (*MD__buffer_transform) (volatile MD__buffer_chunk_t *curr_chunk,
                               unsigned int sample_rate,
                               unsigned int channels,
                               unsigned int bps);
