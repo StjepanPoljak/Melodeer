@@ -41,39 +41,39 @@ int main (int argc, char *argv[])
 
     void *(* decoder)(void *) = NULL;
 
-    MD__buffer_transform = transform;
+    MD__file_t MD__file;
 
-        MD__file_t MD__file;
+    MD__file.MD__buffer_transform = transform;
 
-        for (int i=1; i<argc; i++) {
+    for (int i=1; i<argc; i++) {
 
-            printf("\nLoading: %s\n", argv[i]);
+        printf("\nLoading: %s\n", argv[i]);
 
-            if (MD__initialize (&MD__file, argv[i])) {
+        if (MD__initialize (&MD__file, argv[i])) {
 
-                MD__filetype type = MD__get_extension (argv[i]);
+            MD__filetype type = MD__get_extension (argv[i]);
 
-                switch (type) {
+            switch (type) {
 
-                    case MD__FLAC:
-                        decoder = MDFLAC__start_decoding;
-                        break;
+                case MD__FLAC:
+                    decoder = MDFLAC__start_decoding;
+                    break;
 
-                    case MD__WAV:
-                        decoder = MDWAV__parse;
-                        break;
+                case MD__WAV:
+                    decoder = MDWAV__parse;
+                    break;
 
-                    case MD__MP3:
-                        decoder = MDLAME__decoder;
-                        break;
+                case MD__MP3:
+                    decoder = MDLAME__decoder;
+                    break;
 
-                    default:
-                        printf ("Unknown file type.\n");
-                        break;
-                    }
+                default:
+                    printf ("Unknown file type.\n");
+                    break;
+                }
 
-                MD__play (&MD__file, decoder, MD__handle_metadata,
-                          MD__playing_handle, MD__handle_errors, MD__completion);
+            MD__play (&MD__file, decoder, MD__handle_metadata,
+                      MD__playing_handle, MD__handle_errors, MD__completion);
         }
     }
 

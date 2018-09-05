@@ -1,3 +1,5 @@
+#ifndef MDCORE_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -74,6 +76,11 @@ struct MD__file {
 
     ALuint           *MDAL__buffers;
     ALuint           MDAL__source;
+
+    void (*MD__buffer_transform) (volatile MD__buffer_chunk_t *curr_chunk,
+                                  unsigned int sample_rate,
+                                  unsigned int channels,
+                                  unsigned int bps);
 };
 
 typedef struct MD__file MD__file_t;
@@ -118,9 +125,9 @@ void    MD__unlock                  (MD__file_t *MD__file);
 unsigned int    MD__get_buffer_size         (MD__file_t *MD__file);
 unsigned int    MD__get_buffer_num          (MD__file_t *MD__file);
 
-void (*MD__buffer_transform) (volatile MD__buffer_chunk_t *curr_chunk,
-                              unsigned int sample_rate,
-                              unsigned int channels,
-                              unsigned int bps);
 
 void MD__log (char *string);
+
+#endif
+
+#define MDCORE_H

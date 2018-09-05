@@ -9,10 +9,6 @@ void    MD__remove_buffer_head      (MD__file_t *MD__file);
 void    MDAL__clear                 (MD__file_t *MD__file);
 
 void (*MD__metadata_fptr)       (MD__metadata_t) = NULL;
-void (*MD__buffer_transform)    (volatile MD__buffer_chunk_t *,
-                                 unsigned int sample_rate,
-                                 unsigned int channels,
-                                 unsigned int bps) = NULL;
 
 bool logging = true;
 
@@ -116,12 +112,12 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     for(int i=0; i<MD__general.MD__buff_num; i++) {
 
         MD__lock (MD__file);
-        if (MD__buffer_transform != NULL) {
+        if (MD__file->MD__buffer_transform != NULL) {
 
-            MD__buffer_transform (MD__file->MD__current_chunk,
-                                  MD__file->MD__metadata.sample_rate,
-                                  MD__file->MD__metadata.channels,
-                                  MD__file->MD__metadata.bps);
+            MD__file->MD__buffer_transform (MD__file->MD__current_chunk,
+                                            MD__file->MD__metadata.sample_rate,
+                                            MD__file->MD__metadata.channels,
+                                            MD__file->MD__metadata.bps);
         }
 
         alBufferData (MD__file->MDAL__buffers[i], MD__file->MD__metadata.format, MD__file->MD__current_chunk->chunk,
@@ -191,12 +187,12 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
                 break;
             }
 
-            if (MD__buffer_transform != NULL) {
+            if (MD__file->MD__buffer_transform != NULL) {
 
-                MD__buffer_transform (MD__file->MD__current_chunk,
-                                      MD__file->MD__metadata.sample_rate,
-                                      MD__file->MD__metadata.channels,
-                                      MD__file->MD__metadata.bps);
+                MD__file->MD__buffer_transform (MD__file->MD__current_chunk,
+                                                MD__file->MD__metadata.sample_rate,
+                                                MD__file->MD__metadata.channels,
+                                                MD__file->MD__metadata.bps);
             }
             alBufferData (buffer, MD__file->MD__metadata.format, MD__file->MD__current_chunk->chunk,
                           MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
