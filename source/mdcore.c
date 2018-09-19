@@ -13,12 +13,15 @@ void (*MD__metadata_fptr)       (MD__metadata_t) = NULL;
 bool logging = true;
 
 void MD__log (char *string) {
+// will add debugging later
+#ifdef DEBUG
     FILE *f;
     f = fopen("mdcore.log", "a");
     if (f == NULL) return;
-    fprintf (f, string);
+    fprintf (f, "%s", string);
     fprintf (f, "\n");
     fclose (f);
+#endif
 }
 
 void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
