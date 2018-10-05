@@ -22,6 +22,7 @@ main.o: $(srcdir)/main.c
 .PHONY=clean
 clean:
 	-rm $(builddir)/* $(proj)
+	-rm mdcore.log
 
 .PHONY=clso
 clso:

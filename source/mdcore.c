@@ -1,9 +1,19 @@
 #include "mdcore.h"
 
+#define DEBUG
+
+#ifdef DEBUG
+    #include <sys/time.h>
+
+    #define SEC_PER_DAY   86400
+    #define SEC_PER_HOUR  3600
+    #define SEC_PER_MIN   60
+#endif
+
 MD__general_t MD__general;
 
 void    MDAL__buff_init             (MD__file_t *MD__file);
-int     MDAL__pop_error             (char *message, int code);
+void    MDAL__pop_error             (char *message, int code);
 ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
 void    MD__remove_buffer_head      (MD__file_t *MD__file);
 void    MDAL__clear                 (MD__file_t *MD__file);
@@ -13,14 +23,20 @@ void (*MD__metadata_fptr)       (MD__metadata_t) = NULL;
 bool logging = true;
 
 void MD__log (char *string) {
-// will add debugging later
+
 #ifdef DEBUG
+
     FILE *f;
-    f = fopen("mdcore.log", "a");
+    f = fopen ("mdcore.log", "a");
     if (f == NULL) return;
-    fprintf (f, "%s", string);
-    fprintf (f, "\n");
+
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    
+    fprintf (f, "[%02d.%02d.%04d. %02d:%02d:%02d] : %s\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec, string);
+    
     fclose (f);
+
 #endif
 }
 
@@ -29,13 +45,27 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
                void (*error_handle) (char *), void (*completion) (void)) {
 
     if (MD__file == NULL) {
-        error_handle("File not initialized.");
+        
+        char *message = "Could not initialize file.";
+
+        #ifdef DEBUG
+            MD__log (message);
+        #endif
+
+        error_handle (message);
         return;
     }
 
     if ((MD__general.MD__pre_buff < MD__general.MD__buff_num) && (MD__general.MD__pre_buff != 0)) {
 
-        error_handle("Pre-buffer must be equal or larger than number of buffers.");
+        char *message = "Pre-buffer must be equal or larger than number of buffers.";
+
+        #ifdef DEBUG
+            MD__log (message);
+        #endif
+
+        error_handle (message);
+
         return;
     }
 
@@ -46,10 +76,22 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     pthread_t decoder_thread;
 
-    if (pthread_create (&decoder_thread, NULL, decoder_func, (void *)MD__file))
-    {
+    if (pthread_create (&decoder_thread, NULL, decoder_func, (void *)MD__file)) {
+
+        char *message = "Error creating thread.";
+
+        #ifdef DEBUG
+            MD__log (message);
+        #endif
+
+        error_handle (message);
+
+        #ifdef DEBUG
+            MD__log("Closing OpenAL.");
+        #endif
+
         MDAL__close();
-        error_handle ("Error creating thread.");
+
         return;
     }
 #endif
@@ -72,6 +114,10 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     }
 #endif
 
+    #ifdef DEBUG
+        MD__log ("Waiting for metadata to load.");
+    #endif
+
     while (true) {
 
         MD__lock (MD__file);
@@ -81,6 +127,14 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         }
         MD__unlock (MD__file);
     }
+
+    #ifdef DEBUG
+        MD__log ("Metadata loaded.");
+    #endif
+
+    #ifdef DEBUG
+        MD__log ("Waiting to fill pre-buffer.");
+    #endif
 
     while (true) {
 
@@ -110,7 +164,15 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         MD__unlock (MD__file);
     }
 
+    #ifdef DEBUG
+        MD__log ("Pre-buffer filled.");
+    #endif
+
     MDAL__buff_init (MD__file);
+
+    #ifdef DEBUG
+        MD__log ("Buffers initialized.");
+    #endif
 
     for(int i=0; i<MD__general.MD__buff_num; i++) {
 
@@ -137,13 +199,27 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         MD__unlock (MD__file);
     }
 
+    #ifdef DEBUG
+        MD__log ("Buffers transfered to OpenAL.");
+    #endif
+
+    #ifdef DEBUG
+        MD__log ("Enqueuing buffers.");
+    #endif
+
     alSourceQueueBuffers (MD__file->MDAL__source, MD__general.MD__buff_num, MD__file->MDAL__buffers);
+
+    #ifdef DEBUG
+        MD__log ("Attempting to play.");
+    #endif
+
     alSourcePlay (MD__file->MDAL__source);
 
-    // error_handle ("Playing...");
     MD__file->MD__is_playing = true;
 
-    MD__log("Playing.");
+    #ifdef DEBUG
+        MD__log ("Playing.");
+    #endif
 
     playing_handle();
 
@@ -157,6 +233,12 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         // the && !MD__file->MD__stop_playing, etc... is only to make signal fall through to if below
         if ((MD__file->MD__current_chunk->next == NULL && MD__file->MD__decoding_done)
         || MD__file->MD__stop_playing) {
+
+            #ifdef DEBUG
+                if (MD__file->MD__stop_playing) MD__log ("Stop signal received.");
+                else MD__log ("All buffers queued, breaking loop.");
+            #endif
+
             MD__unlock (MD__file);
 
             break;
@@ -167,7 +249,16 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
         if(val != AL_PLAYING) {
 
+            #ifdef DEBUG
+                MD__log ("Buffer underrun.");
+            #endif
+
+            // will make a special closure for this
             error_handle ("Buffer underrun.");
+
+            #ifdef DEBUG
+                MD__log ("Attempting to resume playing.");
+            #endif
 
             alSourcePlay (MD__file->MDAL__source);
         }
@@ -180,6 +271,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         }
 
         for(int i=0; i<val; i++) {
+
             alSourceUnqueueBuffers (MD__file->MDAL__source, 1, &buffer);
 
             MD__lock (MD__file);
@@ -206,6 +298,11 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
             if (MD__file->MD__decoding_done && MD__file->MD__current_chunk->next == NULL) {
                 MD__unlock (MD__file);
+
+                #ifdef DEBUG
+                    MD__log ("No more buffers to add, breaking the loop.");
+                #endif
+
                 break;
             }
 
@@ -216,20 +313,35 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         } // for
     } // while
 
+    #ifdef DEBUG
+        MD__log ("Waiting for playing to stop.");
+    #endif
+
+
     while (val == AL_PLAYING) {
 
         MD__lock (MD__file);
         if (MD__file->MD__stop_playing) {
+
+            #ifdef DEBUG
+                MD__log ("There was a stop signal - playing forcibly stopped.");
+            #endif
+
             alSourceStop (MD__file->MDAL__source);
             MD__unlock (MD__file);
 
             break;
         }
         else {
+
             alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
         }
         MD__unlock (MD__file);
     }
+
+    #ifdef DEBUG
+        MD__log ("Clearing remaining buffer data.");
+    #endif
 
     MD__clear_buffer(MD__file);
 
@@ -267,10 +379,22 @@ bool MD__did_stop (MD__file_t *MD__file) {
 
 void MDAL__buff_init (MD__file_t *MD__file) {
 
+    #ifdef DEBUG
+        MD__log ("Allocating memory space for buffers.");
+    #endif
+
     MD__file->MDAL__buffers = malloc (sizeof (ALuint) * MD__general.MD__buff_num);
+
+    #ifdef DEBUG
+        MD__log ("Generating sources.");
+    #endif
 
     alGenSources((ALuint)1, &MD__file->MDAL__source);
     MDAL__pop_error("Error generating source.", 4);
+
+    #ifdef DEBUG
+        MD__log ("Generating buffers.");
+    #endif
 
     alGenBuffers((ALuint)MD__general.MD__buff_num, MD__file->MDAL__buffers);
     MDAL__pop_error("Error creating buffer.", 5);
@@ -288,7 +412,10 @@ void MDAL__initialize (unsigned int buffer_size,
 
     if (!MD__general.MDAL__device)
     {
-        printf("Cannot open device.\n");
+        #ifdef DEBUG
+            MD__log ("Could not open device.");
+        #endif
+        
         exit(1);
     }
 
@@ -296,12 +423,15 @@ void MDAL__initialize (unsigned int buffer_size,
 
     if (!alcMakeContextCurrent(MD__general.MDAL__context))
     {
-        printf("Error creating context.\n");
+        #ifdef DEBUG
+            MD__log ("Error creating context.");
+        #endif
+
         exit(2);
     }
 }
 
-int MDAL__pop_error (char *message, int code)
+void MDAL__pop_error (char *message, int code)
 {
     ALCenum error;
 
@@ -309,12 +439,16 @@ int MDAL__pop_error (char *message, int code)
 
     if (error != AL_NO_ERROR)
     {
+        #ifdef DEBUG
+            MD__log (message);
+        #endif
+
         MDAL__close ();
-        printf ("OpenAL error: %s\n", message);
+
         exit (code);
     }
 
-    return code;
+    return;
 }
 
 ALenum MDAL__get_format (unsigned int channels, unsigned int bps) {
@@ -349,29 +483,75 @@ ALenum MDAL__get_format (unsigned int channels, unsigned int bps) {
 
 void MDAL__clear (MD__file_t *MD__file) {
 
+    #ifdef DEBUG
+        MD__log ("Deleting sources.");
+    #endif
+
     alDeleteSources         (1, &MD__file->MDAL__source);
+
+    #ifdef DEBUG
+        MD__log ("Deleting buffers.");
+    #endif
+
     alDeleteBuffers         ((ALuint) MD__general.MD__buff_num, MD__file->MDAL__buffers);
+
+    #ifdef DEBUG
+        MD__log ("Freeing buffers.");
+    #endif
 
     free(MD__file->MDAL__buffers);
 }
 
 void MDAL__close () {
 
+    #ifdef DEBUG
+        MD__log ("Getting device context.");
+    #endif
+
     MD__general.MDAL__device = alcGetContextsDevice (MD__general.MDAL__context);
+
+    #ifdef DEBUG
+        MD__log ("Current context set to NULL.");
+    #endif
+
     alcMakeContextCurrent   (NULL);
+
+    #ifdef DEBUG
+        MD__log ("Destroying context.");
+    #endif
+
     alcDestroyContext       (MD__general.MDAL__context);
+
+    #ifdef DEBUG
+        MD__log ("Closing device.");
+    #endif
+
     alcCloseDevice          (MD__general.MDAL__device);
 }
 
 bool MD__initialize (MD__file_t *MD__file, char *filename) {
 
     MD__file->filename = filename;
+
+    #ifdef DEBUG
+        MD__log ("Opening file.");
+    #endif
+
     MD__file->file = fopen(filename,"rb");
 
     if (MD__file->file == NULL) {
-        // printf(" (!) Could not open file %s\n", filename);
+
+        #ifdef DEBUG
+            MD__log ("Could not open file.");
+        #endif
+
         return false;
     }
+
+    #ifdef DEBUG
+        MD__log ("Resetting MD__file variables.");
+    #endif
+
 
     MD__file->MD__first_chunk     = NULL;
     MD__file->MD__current_chunk   = NULL;
@@ -388,6 +568,11 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
 
     MD__file->MD__stop_playing    = false;
     MD__file->MD__pause_playing   = false;
+
+    #ifdef DEBUG
+        MD__log ("MD__file variables reset.");
+    #endif
+
 
     return true;
 }
@@ -510,6 +695,10 @@ unsigned int MD__get_buffer_num (MD__file_t *MD__file) {
 
 void MD__decoding_done_signal (MD__file_t *MD__file) {
 
+    #ifdef DEBUG
+        MD__log ("Decoding done signal received.");
+    #endif
+
     MD__lock (MD__file);
     MD__file->MD__decoding_done = true;
     MD__unlock (MD__file);
@@ -527,6 +716,10 @@ bool MD__set_metadata (MD__file_t *MD__file,
                        unsigned int channels,
                        unsigned int bps,
                        unsigned int total_samples) {
+
+    #ifdef DEBUG
+        MD__log ("Setting metadata.");
+    #endif
 
     MD__lock (MD__file);
     MD__file->MD__metadata.sample_rate        = sample_rate;
