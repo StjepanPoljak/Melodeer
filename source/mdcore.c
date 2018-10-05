@@ -1,5 +1,7 @@
 #include "mdcore.h"
 
+#define MDCORE__DEBUG
+
 #ifdef MDCORE__DEBUG
 
     #include <sys/time.h>
@@ -7,6 +9,33 @@
     #define SEC_PER_DAY   86400
     #define SEC_PER_HOUR  3600
     #define SEC_PER_MIN   60
+
+    void MD__reset_log () {
+
+        FILE *f;
+        f = fopen ("mdcore.log", "w");
+
+        if (f == NULL) return;
+
+        fprintf (f, "");
+
+        fclose (f);
+    }
+
+    void MD__log (char *string) {
+
+        FILE *f;
+        f = fopen ("mdcore.log", "a");
+        if (f == NULL) return;
+
+        time_t t = time (NULL);
+        struct tm tm = *localtime (&t);
+    
+        fprintf (f, "[%02d.%02d.%04d. %02d:%02d:%02d] : %s\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900,
+                                                               tm.tm_hour, tm.tm_min, tm.tm_sec, string);
+    
+        fclose (f);
+    }
 
 #endif
 
@@ -18,31 +47,12 @@ ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
 void    MD__remove_buffer_head      (MD__file_t *MD__file);
 void    MDAL__clear                 (MD__file_t *MD__file);
 
-void (*MD__metadata_fptr)       (MD__metadata_t) = NULL;
-
-bool logging = true;
-
-void MD__log (char *string) {
-
-#ifdef MDCORE__DEBUG
-
-    FILE *f;
-    f = fopen ("mdcore.log", "a");
-    if (f == NULL) return;
-
-    time_t t = time (NULL);
-    struct tm tm = *localtime (&t);
-    
-    fprintf (f, "[%02d.%02d.%04d. %02d:%02d:%02d] : %s\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec, string);
-    
-    fclose (f);
-
-#endif
-}
+void    (*MD__metadata_fptr)        (MD__metadata_t) = NULL;
 
 void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
-               void (*metadata_handle) (MD__metadata_t), void (*playing_handle)(),
-               void (*error_handle) (char *), void (*completion) (void)) {
+               void (*metadata_handle) (MD__metadata_t), void (*playing_handle) (),
+               void (*error_handle) (char *), void (*buffer_underrun_handle) (),
+               void (*completion) (void)) {
 
     if (MD__file == NULL) {
         
@@ -52,7 +62,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             MD__log (message);
         #endif
 
-        error_handle (message);
+        if (error_handle) error_handle (message);
         return;
     }
 
@@ -64,14 +74,15 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             MD__log (message);
         #endif
 
-        error_handle (message);
+        if (error_handle) error_handle (message);
 
         return;
     }
 
-    MD__metadata_fptr = metadata_handle;
+    if (metadata_handle) MD__metadata_fptr = metadata_handle;
 
-#if defined(linux) || defined(__APPLE__)
+#if defined (linux) || defined (__APPLE__)
+
     pthread_mutex_init (&MD__file->MD__mutex, NULL);
 
     pthread_t decoder_thread;
@@ -84,7 +95,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             MD__log (message);
         #endif
 
-        error_handle (message);
+        if (error_handle) error_handle (message);
 
         #ifdef MDCORE__DEBUG
             MD__log("Closing OpenAL.");
@@ -92,11 +103,13 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
         MDAL__close();
 
-        return;
+        exit(41);
     }
+
 #endif
 
 #ifdef _WIN32
+
     MD__file->MD__mutex = CreateMutex (NULL, FALSE, NULL);
 
     DWORD WINAPI decoder_w32wrapper (LPVOID arg) {
@@ -109,9 +122,10 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     if (!decoder_thread) {
 
         MDAL__close ();
-        error_handle ("Error creating thread.");
+        if (error_handle) error_handle ("Error creating thread.");
         exit(41);
     }
+
 #endif
 
     #ifdef MDCORE__DEBUG
@@ -221,7 +235,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         MD__log ("Playing.");
     #endif
 
-    playing_handle();
+    if (playing_handle) playing_handle ();
 
     ALuint buffer;
     ALint val;
@@ -253,8 +267,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
                 MD__log ("Buffer underrun.");
             #endif
 
-            // will make a special closure for this
-            error_handle ("Buffer underrun.");
+            if (buffer_underrun_handle) buffer_underrun_handle ();
 
             #ifdef MDCORE__DEBUG
                 MD__log ("Attempting to resume playing.");
@@ -347,7 +360,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     MDAL__clear (MD__file);
 
-    completion();
+    if (completion) completion ();
 
 #if defined(linux) || defined(__APPLE__)
     pthread_join (decoder_thread, NULL);
@@ -410,8 +423,8 @@ void MDAL__initialize (unsigned int buffer_size,
 
     MD__general.MDAL__device = alcOpenDevice(NULL);
 
-    if (!MD__general.MDAL__device)
-    {
+    if (!MD__general.MDAL__device) {
+
         #ifdef MDCORE__DEBUG
             MD__log ("Could not open device.");
         #endif
@@ -421,8 +434,8 @@ void MDAL__initialize (unsigned int buffer_size,
 
     MD__general.MDAL__context = alcCreateContext(MD__general.MDAL__device, NULL);
 
-    if (!alcMakeContextCurrent(MD__general.MDAL__context))
-    {
+    if (!alcMakeContextCurrent(MD__general.MDAL__context)) {
+
         #ifdef MDCORE__DEBUG
             MD__log ("Error creating context.");
         #endif
@@ -431,8 +444,8 @@ void MDAL__initialize (unsigned int buffer_size,
     }
 }
 
-void MDAL__pop_error (char *message, int code)
-{
+void MDAL__pop_error (char *message, int code) {
+
     ALCenum error;
 
     error = alGetError();
@@ -577,8 +590,8 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
     return true;
 }
 
-void MD__clear_buffer(MD__file_t *MD__file)
-{
+void MD__clear_buffer(MD__file_t *MD__file) {
+
     while (MD__file->MD__current_chunk != NULL) {
 
         volatile MD__buffer_chunk_t * volatile to_be_freed = MD__file->MD__current_chunk;
@@ -653,8 +666,8 @@ void MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
     }
 }
 
-void MD__add_buffer_chunk_ncp (MD__file_t *MD__file, unsigned char* data, unsigned int size)
-{
+void MD__add_buffer_chunk_ncp (MD__file_t *MD__file, unsigned char* data, unsigned int size) {
+
     MD__buffer_chunk_t *new_chunk = malloc (sizeof (MD__buffer_chunk_t));
     new_chunk->chunk = data;
     new_chunk->next = NULL;
@@ -740,7 +753,7 @@ bool MD__set_metadata (MD__file_t *MD__file,
         return false;
     }
 
-    MD__metadata_fptr (MD__file->MD__metadata);
+    if (MD__metadata_fptr) MD__metadata_fptr (MD__file->MD__metadata);
 
     MD__unlock (MD__file);
 

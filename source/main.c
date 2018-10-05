@@ -73,7 +73,7 @@ int main (int argc, char *argv[])
                 }
 
             MD__play (&MD__file, decoder, MD__handle_metadata,
-                      MD__playing_handle, MD__handle_errors, MD__completion);
+                      MD__playing_handle, MD__handle_errors, NULL, MD__completion);
         }
     }
 

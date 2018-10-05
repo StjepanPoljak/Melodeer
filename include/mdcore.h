@@ -95,9 +95,10 @@ void    MD__clear_buffer            (MD__file_t *MD__file);
 
 void    MD__play                    (MD__file_t *MD__file,
                                      MD__RETTYPE decoder_func (MD__ARGTYPE),
-                                     void (*metadata_handle) (MD__metadata_t metadata),
-                                     void (*playing_handle) (void),
-                                     void (*error_handle) (char *info),
+                                     void (*metadata_handle) (MD__metadata_t),
+                                     void (*playing_handle) (),
+                                     void (*error_handle) (char *),
+                                     void (*buffer_underrun_handle) (),
                                      void (*completion) (void));
 
 void    MD__stop                    (MD__file_t *MD__file);
