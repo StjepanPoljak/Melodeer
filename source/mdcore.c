@@ -360,7 +360,15 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     MDAL__clear (MD__file);
 
+    #ifdef MDCORE__DEBUG
+        MD__log ("Done playing.");
+    #endif
+
     if (completion) completion ();
+
+    #ifdef MDCORE__DEBUG
+        MD__log ("Joining threads.");
+    #endif
 
 #if defined(linux) || defined(__APPLE__)
     pthread_join (decoder_thread, NULL);
@@ -417,9 +425,17 @@ void MDAL__initialize (unsigned int buffer_size,
                        unsigned int buffer_num,
                        unsigned int pre_buffer) {
 
+    #ifdef MDCORE__DEBUG
+        MD__log ("Setting MD__general variables.");
+    #endif
+
     MD__general.MD__buff_size       = buffer_size;
     MD__general.MD__buff_num        = buffer_num;
     MD__general.MD__pre_buff        = pre_buffer;
+
+    #ifdef MDCORE__DEBUG
+        MD__log ("Opening device.");
+    #endif
 
     MD__general.MDAL__device = alcOpenDevice(NULL);
 
@@ -431,6 +447,10 @@ void MDAL__initialize (unsigned int buffer_size,
         
         exit(1);
     }
+
+    #ifdef MDCORE__DEBUG
+        MD__log ("Creating context.");
+    #endif
 
     MD__general.MDAL__context = alcCreateContext(MD__general.MDAL__device, NULL);
 
@@ -718,6 +738,10 @@ void MD__decoding_done_signal (MD__file_t *MD__file) {
 }
 
 void MD__decoding_error_signal (MD__file_t *MD__file) {
+
+    #ifdef MDCORE__DEBUG
+        MD__log ("Decoding error signal received.");
+    #endif
 
     MD__lock (MD__file);
     MD__file->MD__stop_playing = true;
