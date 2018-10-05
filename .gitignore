@@ -1,0 +1,3 @@
+build/*.o
+melodeer
+mdcore.log
