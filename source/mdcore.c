@@ -256,6 +256,10 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
         alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
 
+        #ifdef MDCORE__DEBUG
+            MDLOG__dynamic ("Got source state (%d)", val);
+        #endif
+
         if(val != AL_PLAYING) {
 
             #ifdef MDCORE__DEBUG
