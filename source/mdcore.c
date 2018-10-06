@@ -1,44 +1,5 @@
 #include "mdcore.h"
 
-#define MDCORE__DEBUG
-
-#ifdef MDCORE__DEBUG
-
-    #include <sys/time.h>
-
-    #define SEC_PER_DAY   86400
-    #define SEC_PER_HOUR  3600
-    #define SEC_PER_MIN   60
-
-    void MD__reset_log () {
-
-        FILE *f;
-        f = fopen ("mdcore.log", "w");
-
-        if (f == NULL) return;
-
-        fprintf (f, "");
-
-        fclose (f);
-    }
-
-    void MD__log (char *string) {
-
-        FILE *f;
-        f = fopen ("mdcore.log", "a");
-        if (f == NULL) return;
-
-        time_t t = time (NULL);
-        struct tm tm = *localtime (&t);
-    
-        fprintf (f, "[%02d.%02d.%04d. %02d:%02d:%02d] : %s\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900,
-                                                               tm.tm_hour, tm.tm_min, tm.tm_sec, string);
-    
-        fclose (f);
-    }
-
-#endif
-
 MD__general_t MD__general;
 
 void    MDAL__buff_init             (MD__file_t *MD__file);
@@ -54,9 +15,11 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
                void (*error_handle) (char *), void (*buffer_underrun_handle) (),
                void (*completion) (void)) {
 
+    MD__log ("--------- MD__play called ----------");
+
     if (MD__file == NULL) {
-        
-        char *message = "Could not initialize file.";
+
+        char *message = "MD__file not initialied.";
 
         #ifdef MDCORE__DEBUG
             MD__log (message);
@@ -239,6 +202,10 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     ALuint buffer;
     ALint val;
+
+    #ifdef MDCORE__DEBUG
+        MD__log ("Entering main loop.");
+    #endif
 
     while (true)
     {
@@ -444,7 +411,7 @@ void MDAL__initialize (unsigned int buffer_size,
         #ifdef MDCORE__DEBUG
             MD__log ("Could not open device.");
         #endif
-        
+
         exit(1);
     }
 
@@ -567,7 +534,7 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
     MD__file->filename = filename;
 
     #ifdef MDCORE__DEBUG
-        MD__log ("Opening file.");
+        MD__log ("Opening file (%s).", filename);
     #endif
 
     MD__file->file = fopen(filename,"rb");

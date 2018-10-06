@@ -1,5 +1,5 @@
 proj = melodeer
-objects = main.o mdcore.o mdflac.o mdwav.o mdlame.o
+objects = main.o mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
 libs = openal FLAC pthread mp3lame
 libdir = /usr/local/lib
 lib64dir = /lib64
@@ -31,7 +31,7 @@ clso:
 	-rm -rf $(incdir)/$(proj)
 	ldconfig
 
-shared: mdcore.o mdflac.o mdwav.o mdlame.o
+shared: mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
 	gcc -shared $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o lib$(proj).so
 	-cp lib$(proj).so $(lib64dir)/
 	mv lib$(proj).so $(libdir)/

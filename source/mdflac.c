@@ -3,16 +3,15 @@
 
 FLAC__StreamDecoder *MDFLAC__decoder = 0;
 
-void *MDFLAC__start_decoding (void *MD__file)
-{
+void *MDFLAC__start_decoding (void *MD__file) {
+
     FLAC__bool                      ok = true;
 
     FLAC__StreamDecoderInitStatus   init_status;
 
-    if ((MDFLAC__decoder = FLAC__stream_decoder_new ()) == NULL) {
+    if ((MDFLAC__decoder = FLAC__stream_decoder_new ()) == NULL)
 
         MD__decoding_error_signal ((MD__file_t *)MD__file);
-    }
 
     init_status = FLAC__stream_decoder_init_FILE (MDFLAC__decoder,
                                                  ((MD__file_t *) MD__file)->file,
@@ -21,27 +20,18 @@ void *MDFLAC__start_decoding (void *MD__file)
                                                   MDFLAC__error_callback,
                                                   MD__file);
 
-    if (init_status != FLAC__STREAM_DECODER_INIT_STATUS_OK) {
+    if (init_status != FLAC__STREAM_DECODER_INIT_STATUS_OK) ok = false;
 
-        ok = false;
-    }
+    if (ok) ok = FLAC__stream_decoder_process_until_end_of_stream (MDFLAC__decoder);
 
-    if (ok) {
+    FLAC__stream_decoder_finish (MDFLAC__decoder);
+    FLAC__stream_decoder_delete (MDFLAC__decoder);
 
-        ok = FLAC__stream_decoder_process_until_end_of_stream (MDFLAC__decoder);
-    }
+    MD__decoding_done_signal ((MD__file_t *)MD__file);
 
-    FLAC__stream_decoder_finish(MDFLAC__decoder);
-    FLAC__stream_decoder_delete(MDFLAC__decoder);
+    if (!ok) MD__decoding_error_signal ((MD__file_t *) MD__file);
 
-    MD__decoding_done_signal((MD__file_t *)MD__file);
-
-    if (!ok) {
-
-        MD__decoding_error_signal((MD__file_t *) MD__file);
-    }
-
-    MD__exit_decoder();
+    MD__exit_decoder ();
 
     return NULL;
 }
@@ -78,7 +68,9 @@ void MDFLAC__error_callback (const FLAC__StreamDecoder          *MDFLAC__decoder
 
     MD__decoding_error_signal ((MD__file_t *)client_data);
 
-	//printf("Got error callback: %s\n", FLAC__StreamDecoderErrorStatusString[status]);
+    #ifdef MDCORE__DEBUG
+        MD__log ("Got error callback: %s\n", FLAC__StreamDecoderErrorStatusString[status]);
+    #endif
 }
 
 static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__StreamDecoder     *MDFLAC__decoder,

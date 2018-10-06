@@ -1,19 +1,31 @@
 #ifndef MDCORE_H
 
+#define MDCORE__DEBUG
+
+#ifdef MDCORE__DEBUG
+    #include "mdlog.h"
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
 #ifdef _WIN32
-#include <windows.h>
-typedef LPVOID MD__ARGTYPE;
-typedef DWORD WINAPI MD__RETTYPE;
+
+    #include <windows.h>
+
+    typedef LPVOID MD__ARGTYPE;
+    typedef DWORD WINAPI MD__RETTYPE;
+
 #endif
 
-#if defined(linux) || defined(__APPLE__)
-#include <pthread.h>
-typedef void * MD__ARGTYPE;
-typedef void * MD__RETTYPE;
+#if defined (linux) || defined (__APPLE__)
+
+    #include <pthread.h>
+
+    typedef void * MD__ARGTYPE;
+    typedef void * MD__RETTYPE;
+
 #endif
 
 #include <AL/al.h>
@@ -24,7 +36,7 @@ struct MD__buffer_chunk {
     unsigned char               *chunk;
     unsigned int                size;
     unsigned int                order;
-    struct MD__buffer_chunk     *next;
+    struct MD__buffer_chunk      *next;
 };
 
 struct MD__metadata {
@@ -86,12 +98,12 @@ struct MD__file {
 typedef struct MD__file MD__file_t;
 typedef struct MD__general MD__general_t;
 
-void    MD__add_to_buffer           (MD__file_t *MD__file, unsigned char data);
-void    MD__add_to_buffer_raw       (MD__file_t *MD__file, unsigned char data);
-void    MD__add_buffer_chunk_ncp    (MD__file_t *MD__file, unsigned char* data, unsigned int size);
+void    MD__add_to_buffer            (MD__file_t *MD__file, unsigned char data);
+void    MD__add_to_buffer_raw        (MD__file_t *MD__file, unsigned char data);
+void    MD__add_buffer_chunk_ncp     (MD__file_t *MD__file, unsigned char* data, unsigned int size);
 
 bool    MD__initialize              (MD__file_t *MD__file, char *filename);
-void    MD__clear_buffer            (MD__file_t *MD__file);
+void    MD__clear_buffer             (MD__file_t *MD__file);
 
 void    MD__play                    (MD__file_t *MD__file,
                                      MD__RETTYPE decoder_func (MD__ARGTYPE),
@@ -125,9 +137,6 @@ void    MD__unlock                  (MD__file_t *MD__file);
 
 unsigned int    MD__get_buffer_size         (MD__file_t *MD__file);
 unsigned int    MD__get_buffer_num          (MD__file_t *MD__file);
-
-
-void MD__log (char *string);
 
 #endif
 
