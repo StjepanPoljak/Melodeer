@@ -1,5 +1,5 @@
 proj = melodeer
-objects = main.o mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
+objects = main.o mdflac.o mdwav.o mdlame.o mdlog.o
 libs = openal FLAC pthread mp3lame
 libdir = /usr/local/lib
 lib64dir = /lib64
@@ -9,15 +9,22 @@ srcdir = source
 builddir = build
 depsdir = include
 
-$(proj): $(objects)
+$(proj): $(objects) mdcore.o
 	gcc $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o $(proj)
 
 %.o : $(srcdir)/%.c $(depsdir)/%.h
-	gcc -c -fPIC $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3
+	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(OFLAGS)
+
+mdcore.o : $(srcdir)/mdcore.c $(depsdir)/mdcore.h
+	gcc -c $(srcdir)/mdcore.c -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(MDCOREFLAGS)
 
 main.o: $(srcdir)/main.c
 	-mkdir $(builddir)
-	gcc -c -fPIC $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3
+	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(MAINFLAGS)
+
+.PHONY=debug
+debug: MDCOREFLAGS=-D MDCORE_DEBUG
+debug: $(proj)
 
 .PHONY=clean
 clean:
@@ -31,11 +38,21 @@ uninstall:
 	-rm -rf $(incdir)/$(proj)
 	ldconfig
 
-.PHONY=shared
-shared:
+.PHONY=shared_common
+shared_common:
 	-mkdir $(builddir)
-	make shared_internal
 
+.PHONY=shared_debug
+shared_debug: shared_common
+shared_debug: MDCOREFLAGS=-fPIC -D MDCORE_DEBUG
+shared_debug: shared_internal
+
+.PHONY=shared
+shared: shared_common
+shared: MDCOREFLAGS=-fPIC
+shared: shared_internal
+
+shared_internal: OFLAGS=-fPIC
 shared_internal: mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
 	gcc -shared $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o lib$(proj).so
 	-cp lib$(proj).so $(lib64dir)/
@@ -47,11 +64,9 @@ shared_internal: mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
 	-ldconfig
 
 .PHONY=run
-run:
-	make $(proj)
+run: $(proj)
 	./$(proj)
 
-.PHONY=debug
-debug:
-	make $(proj)
+.PHONY=valgrind
+valgrind: $(proj)
 	valgrind ./$(proj)

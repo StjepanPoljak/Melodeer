@@ -71,7 +71,7 @@ void MDLOG__reset_log () {
 
     if (f == NULL) return;
 
-    fprintf (f, "");
+    fprintf (f, "%c", 0);
 
     fclose (f);
 

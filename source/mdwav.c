@@ -23,8 +23,10 @@ void *MDWAV__parse (void *MD__file)
 
     FILE *file = ((MD__file_t *)MD__file)->file;
 
+    int temp_read_res = 0;
+
     // 1-4 RIFF
-    fread (buffer, 1, 4, file);
+    temp_read_res = fread (buffer, 1, 4, file);
 
     if (buffer[0] != 'R'
      || buffer[1] != 'I'
@@ -35,7 +37,7 @@ void *MDWAV__parse (void *MD__file)
     }
 
     // 5-8 size
-    fread (buffer, 1, 4, file);
+    temp_read_res = fread (buffer, 1, 4, file);
 
     int fsize = buffer [3] << 24
               | buffer [2] << 16
@@ -43,7 +45,7 @@ void *MDWAV__parse (void *MD__file)
               | buffer [0];
 
     // 9-12 WAVE
-    fread (buffer, 1, 4, file);
+    temp_read_res = fread (buffer, 1, 4, file);
 
     if (buffer[0] != 'W'
      || buffer[1] != 'A'
@@ -54,7 +56,7 @@ void *MDWAV__parse (void *MD__file)
     }
 
     // 13-16 'fmt '
-    fread (buffer, 1, 4, file);
+    temp_read_res = fread (buffer, 1, 4, file);
     if (buffer [0] != 'f'
      || buffer [1] != 'm'
      || buffer [2] != 't'
@@ -64,14 +66,14 @@ void *MDWAV__parse (void *MD__file)
     }
 
     // 17-20 fmt length
-    fread (buffer, 1, 4, file);
+    temp_read_res = fread (buffer, 1, 4, file);
     unsigned int fmtlen = buffer [3] << 24
                         | buffer [2] << 16
                         | buffer [1] << 8
                         | buffer [0];
 
     // 21-22 format type ( 1 = PCM )
-    fread (buffer, 1, 2, file);
+    temp_read_res = fread (buffer, 1, 2, file);
     if (buffer[1] != 0
      || buffer[0] != 1) {
 
@@ -81,19 +83,19 @@ void *MDWAV__parse (void *MD__file)
     }
 
     // 23-24 channels
-    fread (buffer, 1, 2, file);
+    temp_read_res = fread (buffer, 1, 2, file);
     channels  = buffer [1] << 8
               | buffer [0];
 
     // 25-28 sample rate
-    fread (buffer, 1, 4, file);
+    temp_read_res = fread (buffer, 1, 4, file);
     frequency = buffer [3] << 24
               | buffer [2] << 16
               | buffer [1] << 8
               | buffer [0];
 
     // 29-32 byte rate
-    fread (buffer, 1, 4, file);
+    temp_read_res = fread (buffer, 1, 4, file);
 
     int block_size = buffer [3] << 24
                    | buffer [2] << 16
@@ -101,12 +103,12 @@ void *MDWAV__parse (void *MD__file)
                    | buffer [0];
 
     // 33-34 block alignment
-    fread (buffer, 1, 2, file);
+    temp_read_res = fread (buffer, 1, 2, file);
     int block_align = buffer[1]<<8
                     | buffer[0];
 
     // 35-36 bits per sample
-    fread (buffer, 1, 2, file);
+    temp_read_res = fread (buffer, 1, 2, file);
     bits = buffer [1] << 8
          | buffer [0];
 
@@ -117,7 +119,7 @@ void *MDWAV__parse (void *MD__file)
     }
 
     // next 4 bytes data marker
-    fread (buffer, 1, 4, file);
+    temp_read_res = fread (buffer, 1, 4, file);
 
     if (buffer[0] != 'd'
      || buffer[1] != 'a'
@@ -130,7 +132,7 @@ void *MDWAV__parse (void *MD__file)
     }
 
     // data size
-    fread (buffer, 1, 4, file);
+    temp_read_res = fread (buffer, 1, 4, file);
     unsigned int data_size = buffer [3] << 24
                            | buffer [2] << 16
                            | buffer [1] << 8
