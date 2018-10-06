@@ -24,14 +24,19 @@ clean:
 	-rm $(builddir)/* $(proj)
 	-rm mdcore.log
 
-.PHONY=clso
-clso:
+.PHONY=uninstall
+uninstall:
 	-rm $(lib64dir)/lib$(proj).so
 	-rm $(libdir)/lib$(proj).so
 	-rm -rf $(incdir)/$(proj)
 	ldconfig
 
-shared: mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
+.PHONY=shared
+shared:
+	-mkdir $(builddir)
+	make shared_internal
+
+shared_internal: mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
 	gcc -shared $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o lib$(proj).so
 	-cp lib$(proj).so $(lib64dir)/
 	mv lib$(proj).so $(libdir)/

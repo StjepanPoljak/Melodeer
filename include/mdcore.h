@@ -49,7 +49,7 @@ struct MD__metadata {
 };
 
 typedef struct      MD__buffer_chunk    MD__buffer_chunk_t;
-typedef struct      MD__metadata        MD__metadata_t;
+typedef struct      MD__metadata       MD__metadata_t;
 
 struct MD__general {
 
@@ -69,12 +69,12 @@ struct MD__file {
     volatile    MD__buffer_chunk_t     *MD__current_chunk;
     volatile    MD__buffer_chunk_t     *MD__last_chunk;
 
-#if defined(linux) || defined(__APPLE__)
-    pthread_mutex_t     MD__mutex;
+#if defined (linux) || defined (__APPLE__)
+    pthread_mutex_t         MD__mutex;
 #endif
 
 #ifdef _WIN32
-    HANDLE              MD__mutex;
+    HANDLE                  MD__mutex;
 #endif
 
     MD__metadata_t          MD__metadata;
@@ -86,13 +86,13 @@ struct MD__file {
     volatile bool           MD__stop_playing;
     volatile bool           MD__pause_playing;
 
-    ALuint           *MDAL__buffers;
-    ALuint           MDAL__source;
+    ALuint                  *MDAL__buffers;
+    ALuint                  MDAL__source;
 
-    void (*MD__buffer_transform) (volatile MD__buffer_chunk_t *curr_chunk,
-                                  unsigned int sample_rate,
-                                  unsigned int channels,
-                                  unsigned int bps);
+    void (*MD__buffer_transform)    (volatile MD__buffer_chunk_t *curr_chunk,
+                                    unsigned int sample_rate,
+                                    unsigned int channels,
+                                    unsigned int bps);
 };
 
 typedef struct MD__file MD__file_t;

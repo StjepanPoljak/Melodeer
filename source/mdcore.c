@@ -15,7 +15,9 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
                void (*error_handle) (char *), void (*buffer_underrun_handle) (),
                void (*completion) (void)) {
 
-    MD__log ("--------- MD__play called ----------");
+    #ifdef MDCORE__DEBUG
+        MD__log ("---------- MD__play called ----------");
+    #endif
 
     if (MD__file == NULL) {
 
@@ -76,6 +78,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     MD__file->MD__mutex = CreateMutex (NULL, FALSE, NULL);
 
     DWORD WINAPI decoder_w32wrapper (LPVOID arg) {
+
         decoder_func((void *)arg);
         return 0;
     }
@@ -149,30 +152,50 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     #ifdef MDCORE__DEBUG
         MD__log ("Buffers initialized.");
+        MDLOG__dynamic_reset ();
     #endif
 
     for(int i=0; i<MD__general.MD__buff_num; i++) {
 
         MD__lock (MD__file);
-        if (MD__file->MD__buffer_transform != NULL) {
+
+        #ifdef MDCORE__DEBUG
+            MDLOG__dynamic ("Calling buffer transform closure.");
+        #endif
+
+        if (MD__file->MD__buffer_transform)
 
             MD__file->MD__buffer_transform (MD__file->MD__current_chunk,
-                                            MD__file->MD__metadata.sample_rate,
-                                            MD__file->MD__metadata.channels,
-                                            MD__file->MD__metadata.bps);
-        }
+                                          MD__file->MD__metadata.sample_rate,
+                                          MD__file->MD__metadata.channels,
+                                          MD__file->MD__metadata.bps);
+
+        #ifdef MDCORE__DEBUG
+          MDLOG__dynamic ("Loading chunk no. %lu with size %lu (out of %lu loaded chunks).",
+                          MD__file->MD__current_chunk->order, MD__file->MD__current_chunk->size,
+                          MD__file->MD__last_chunk->order);
+        #endif
+
 
         alBufferData (MD__file->MDAL__buffers[i], MD__file->MD__metadata.format, MD__file->MD__current_chunk->chunk,
-                      MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
+                     MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
 
-        if (MD__file->MD__current_chunk->next != NULL) {
+        #ifdef MDCORE__DEBUG
+            MDLOG__dynamic ("Loaded chunk no. %lu with size %lu (out of %lu loaded chunks).",
+                            MD__file->MD__current_chunk->order, MD__file->MD__current_chunk->size,
+                            MD__file->MD__last_chunk->order);
+        #endif
+
+        if (MD__file->MD__current_chunk->next != NULL)
 
             MD__file->MD__current_chunk = MD__file->MD__current_chunk->next;
-        }
+
         else if (MD__file->MD__decoding_done) {
+
             MD__unlock (MD__file);
             break;
         }
+
         MD__unlock (MD__file);
     }
 
@@ -181,13 +204,13 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     #endif
 
     #ifdef MDCORE__DEBUG
-        MD__log ("Enqueuing buffers.");
+        MD__log ("Queuing buffers to source.");
     #endif
 
     alSourceQueueBuffers (MD__file->MDAL__source, MD__general.MD__buff_num, MD__file->MDAL__buffers);
 
     #ifdef MDCORE__DEBUG
-        MD__log ("Attempting to play.");
+        MD__log ("Queued buffers.");
     #endif
 
     alSourcePlay (MD__file->MDAL__source);
@@ -205,6 +228,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     #ifdef MDCORE__DEBUG
         MD__log ("Entering main loop.");
+        MDLOG__dynamic_reset ();
     #endif
 
     while (true)
@@ -226,6 +250,10 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         }
         MD__unlock (MD__file);
 
+        #ifdef MDCORE__DEBUG
+            MDLOG__dynamic ("Getting source state.");
+        #endif
+
         alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
 
         if(val != AL_PLAYING) {
@@ -243,14 +271,26 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             alSourcePlay (MD__file->MDAL__source);
         }
 
+        #ifdef MDCORE__DEBUG
+            MDLOG__dynamic ("Getting processed sources.");
+        #endif
+
         alGetSourcei (MD__file->MDAL__source, AL_BUFFERS_PROCESSED, &val);
 
         if (val <= 0) {
+
+            #ifdef MDCORE__DEBUG
+                MDLOG__dynamic ("No free buffers; continuing");
+            #endif
 
             continue;
         }
 
         for(int i=0; i<val; i++) {
+
+            #ifdef MDCORE__DEBUG
+                MDLOG__dynamic ("Unqueuing buffer.");
+            #endif
 
             alSourceUnqueueBuffers (MD__file->MDAL__source, 1, &buffer);
 
@@ -259,19 +299,41 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             if (MD__file->MD__stop_playing) {
                 MD__unlock (MD__file);
 
+                #ifdef MDCORE__DEBUG
+                    MD__log ("Stop signal received during buffer load.");
+                #endif
+
                 break;
             }
 
-            if (MD__file->MD__buffer_transform != NULL) {
+
+            if (MD__file->MD__buffer_transform)
 
                 MD__file->MD__buffer_transform (MD__file->MD__current_chunk,
-                                                MD__file->MD__metadata.sample_rate,
-                                                MD__file->MD__metadata.channels,
-                                                MD__file->MD__metadata.bps);
-            }
+                                              MD__file->MD__metadata.sample_rate,
+                                              MD__file->MD__metadata.channels,
+                                              MD__file->MD__metadata.bps);
+
+            #ifdef MDCORE__DEBUG
+                MDLOG__dynamic ("Loading chunk no. %lu with size %lu (out of %lu loaded chunks).",
+                                MD__file->MD__current_chunk->order, MD__file->MD__current_chunk->size,
+                                MD__file->MD__last_chunk->order);
+            #endif
+
             alBufferData (buffer, MD__file->MD__metadata.format, MD__file->MD__current_chunk->chunk,
-                          MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
+                         MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
+
+            #ifdef MDCORE__DEBUG
+                MDLOG__dynamic ("Loaded chunk no. %lu with size %lu (out of %lu loaded chunks).",
+                                MD__file->MD__current_chunk->order, MD__file->MD__current_chunk->size,
+                                MD__file->MD__last_chunk->order);
+            #endif
+
             MDAL__pop_error ("Error saving buffer data.", 22);
+
+            #ifdef MDCORE__DEBUG
+                MDLOG__dynamic ("Queuing buffers to source.");
+            #endif
 
             alSourceQueueBuffers (MD__file->MDAL__source, 1, &buffer);
             MDAL__pop_error ("Error (un)queuing MD__file->MDAL__buffers.", 23);
@@ -286,6 +348,10 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
                 break;
             }
 
+            #ifdef MDCORE__DEBUG
+                MDLOG__dynamic ("Setting chunk no %lu to %lu.", MD__file->MD__current_chunk->order, MD__file->MD__current_chunk->next->order);
+            #endif
+
             MD__file->MD__current_chunk = MD__file->MD__current_chunk->next;
             MD__unlock (MD__file);
 
@@ -296,7 +362,6 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     #ifdef MDCORE__DEBUG
         MD__log ("Waiting for playing to stop.");
     #endif
-
 
     while (val == AL_PLAYING) {
 
@@ -320,7 +385,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     }
 
     #ifdef MDCORE__DEBUG
-        MD__log ("Clearing remaining buffer data.");
+        MD__log ("Clearing remaining buffer data (%lu to %lu).", MD__file->MD__first_chunk->order, MD__file->MD__last_chunk->order);
     #endif
 
     MD__clear_buffer(MD__file);
@@ -342,7 +407,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 #endif
 
 #ifdef _WIN32
-    WaitForSingleObject(decoder_thread, INFINITE);
+    WaitForSingleObject (decoder_thread, INFINITE);
 #endif
 
 }
@@ -534,7 +599,7 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
     MD__file->filename = filename;
 
     #ifdef MDCORE__DEBUG
-        MD__log ("Opening file (%s).", filename);
+        MD__log ("Opening file: %s.", filename);
     #endif
 
     MD__file->file = fopen(filename,"rb");
@@ -609,8 +674,16 @@ void MD__remove_buffer_head (MD__file_t *MD__file) {
 
     MD__file->MD__first_chunk = MD__file->MD__first_chunk->next;
 
+    #ifdef MDCORE__DEBUG
+        MDLOG__dynamic ("Removing chunk no. %lu (out of %lu loaded)", old_first->order, MD__file->MD__last_chunk->order);
+    #endif
+
     free (old_first->chunk);
     free ((void *)old_first);
+
+    #ifdef MDCORE__DEBUG
+        MDLOG__dynamic ("Head is now at %lu.", MD__file->MD__first_chunk->order);
+    #endif
 
     MD__unlock (MD__file);
 
@@ -626,12 +699,16 @@ void MD__add_to_buffer (MD__file_t *MD__file, unsigned char data) {
 
 void MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
 
-    if ((MD__file->MD__last_chunk != NULL) && (MD__file->MD__last_chunk->size < MD__general.MD__buff_size)) {
+    if ((MD__file->MD__last_chunk) && (MD__file->MD__last_chunk->size < MD__general.MD__buff_size))
 
-            MD__file->MD__last_chunk->chunk [MD__file->MD__last_chunk->size++] = data;
-    }
-    else
-    {
+        MD__file->MD__last_chunk->chunk [MD__file->MD__last_chunk->size++] = data;
+
+    else {
+
+        #ifdef MDCORE__DEBUG
+            MDLOG__dynamic ("Creating new last chunk.");
+        #endif
+
         MD__buffer_chunk_t *new_chunk = malloc (sizeof (MD__buffer_chunk_t));
         new_chunk->chunk = malloc (sizeof (unsigned char) * MD__general.MD__buff_size);
         new_chunk->size = 0;
@@ -641,10 +718,19 @@ void MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
 
         if (MD__file->MD__last_chunk == NULL && MD__file->MD__first_chunk == NULL) {
 
+            #ifdef MDCORE__DEBUG
+                MDLOG__dynamic ("Creating first and last chunks.");
+            #endif
+
             MD__file->MD__first_chunk = new_chunk;
             MD__file->MD__last_chunk = new_chunk;
         }
         else {
+
+            #ifdef MDCORE__DEBUG
+                long order = MD__file->MD__last_chunk->order;
+                MDLOG__dynamic ("Setting new chunk as next to last (order %d).", order);
+            #endif
 
             new_chunk->order = MD__file->MD__last_chunk->order + 1;
             MD__file->MD__last_chunk->next = new_chunk;
@@ -662,11 +748,19 @@ void MD__add_buffer_chunk_ncp (MD__file_t *MD__file, unsigned char* data, unsign
 
     if (MD__file->MD__last_chunk == NULL && MD__file->MD__first_chunk == NULL) {
 
+        #ifdef MDCORE__DEBUG
+            MDLOG__dynamic ("Creating first and last chunks (no copy).");
+        #endif
+
         MD__file->MD__first_chunk = new_chunk;
         MD__file->MD__last_chunk = new_chunk;
         new_chunk->order = 0;
     }
     else {
+
+        #ifdef MDCORE__DEBUG
+            MDLOG__dynamic ("Setting new chunk as next to last (order %lu, no copy).", MD__file->MD__last_chunk->order);
+        #endif
 
         new_chunk->order = MD__file->MD__last_chunk->order + 1;
         MD__file->MD__last_chunk->next = new_chunk;
@@ -745,6 +839,10 @@ bool MD__set_metadata (MD__file_t *MD__file,
     }
 
     if (MD__metadata_fptr) MD__metadata_fptr (MD__file->MD__metadata);
+
+    #ifdef MDCORE__DEBUG
+        MD__log ("Metadata set and dispatched.");
+    #endif
 
     MD__unlock (MD__file);
 
