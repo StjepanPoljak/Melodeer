@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# installs Melodeer development environment
+
 UNAMEOUT="$(uname -s)"
 
 case "${UNAMEOUT}" in
