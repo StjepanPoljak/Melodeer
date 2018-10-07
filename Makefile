@@ -11,6 +11,7 @@ depsdir = include
 
 $(proj): $(objects) mdcore.o
 	gcc $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o $(proj)
+	-./save.sh
 
 %.o : $(srcdir)/%.c $(depsdir)/%.h
 	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(OFLAGS)
@@ -62,6 +63,7 @@ shared_internal: mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
 	-mkdir $(incdir)/$(proj)
 	cp $(depsdir)/*.h $(incdir)/$(proj)/
 	-ldconfig
+	-./save.sh
 
 .PHONY=run
 run: $(proj)

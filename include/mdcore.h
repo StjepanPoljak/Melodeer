@@ -110,6 +110,7 @@ void    MD__play                    (MD__file_t *MD__file,
 void    MD__stop                    (MD__file_t *MD__file);
 bool    MD__did_stop                (MD__file_t *MD__file);
 void    MD__toggle_pause            (MD__file_t *MD__file);
+bool    MD__is_paused               (MD__file_t *MD__file);
 
 void    MD__decoding_done_signal    (MD__file_t *MD__file);
 void    MD__decoding_error_signal   (MD__file_t *MD__file);

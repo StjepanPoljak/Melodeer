@@ -550,6 +550,16 @@ void MD__toggle_pause (MD__file_t *MD__file) {
     MD__unlock (MD__file);
 }
 
+bool MD__is_paused (MD__file_t *MD__file) {
+
+    bool return_val = false;
+
+    MD__lock (MD__file);
+    return_val = MD__file->MD__pause_playing;
+    MD__unlock (MD__file);
+
+    return return_val;
+}
 
 void MDAL__buff_init (MD__file_t *MD__file) {
 

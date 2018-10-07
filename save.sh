@@ -69,5 +69,6 @@ then
 	echo 'exit' >> "lib/install.sh"
 
 	chmod +x "lib/install.sh"
-
 fi
+
+echo "State saved and lib/install.sh generated."
