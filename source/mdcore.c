@@ -476,6 +476,15 @@ void MD__wait_if_paused (MD__file_t *MD__file) {
 
         MD__lock (MD__file);
 
+        if (MD__file->MD__stop_playing) {
+
+            MD__file->MD__pause_playing = false;
+
+            MD__unlock (MD__file);
+
+            break;
+        }
+
         if (!MD__file->MD__pause_playing) {
 
             MD__unlock (MD__file);
