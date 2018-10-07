@@ -30,7 +30,7 @@ struct MD__buffer_chunk {
     unsigned char               *chunk;
     unsigned int                size;
     unsigned int                order;
-    struct MD__buffer_chunk      *next;
+    struct MD__buffer_chunk     *next;
 };
 
 struct MD__metadata {
@@ -42,7 +42,7 @@ struct MD__metadata {
     unsigned int    format;
 };
 
-typedef struct      MD__buffer_chunk    MD__buffer_chunk_t;
+typedef struct      MD__buffer_chunk   MD__buffer_chunk_t;
 typedef struct      MD__metadata       MD__metadata_t;
 
 struct MD__general {
@@ -84,9 +84,9 @@ struct MD__file {
     ALuint                  MDAL__source;
 
     void (*MD__buffer_transform)    (volatile MD__buffer_chunk_t *curr_chunk,
-                                    unsigned int sample_rate,
-                                    unsigned int channels,
-                                    unsigned int bps);
+                                     unsigned int sample_rate,
+                                     unsigned int channels,
+                                     unsigned int bps);
 };
 
 typedef struct MD__file MD__file_t;
@@ -96,7 +96,7 @@ void    MD__add_to_buffer            (MD__file_t *MD__file, unsigned char data);
 void    MD__add_to_buffer_raw        (MD__file_t *MD__file, unsigned char data);
 void    MD__add_buffer_chunk_ncp     (MD__file_t *MD__file, unsigned char* data, unsigned int size);
 
-bool    MD__initialize              (MD__file_t *MD__file, char *filename);
+bool    MD__initialize               (MD__file_t *MD__file, char *filename);
 void    MD__clear_buffer             (MD__file_t *MD__file);
 
 void    MD__play                    (MD__file_t *MD__file,
@@ -109,6 +109,7 @@ void    MD__play                    (MD__file_t *MD__file,
 
 void    MD__stop                    (MD__file_t *MD__file);
 bool    MD__did_stop                (MD__file_t *MD__file);
+void    MD__toggle_pause            (MD__file_t *MD__file);
 
 void    MD__decoding_done_signal    (MD__file_t *MD__file);
 void    MD__decoding_error_signal   (MD__file_t *MD__file);

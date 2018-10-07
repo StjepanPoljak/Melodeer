@@ -9,8 +9,10 @@ MD__general_t MD__general;
 void    MDAL__buff_init             (MD__file_t *MD__file);
 void    MDAL__pop_error             (char *message, int code);
 ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
-void    MD__remove_buffer_head      (MD__file_t *MD__file);
 void    MDAL__clear                 (MD__file_t *MD__file);
+
+void    MD__remove_buffer_head      (MD__file_t *MD__file);
+void    MD__wait_if_paused          (MD__file_t *MD__file);
 
 void    (*MD__metadata_fptr)        (MD__metadata_t) = NULL;
 
@@ -235,8 +237,10 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         MDLOG__dynamic_reset ();
     #endif
 
-    while (true)
-    {
+    while (true) {
+
+        MD__wait_if_paused (MD__file);
+
         MD__lock (MD__file);
 
         if (!MD__file->MD__current_chunk->next && !MD__file->MD__decoding_done) {
@@ -307,13 +311,15 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
         for(int i=0; i<val; i++) {
 
+            MD__wait_if_paused (MD__file);
+
             #ifdef MDCORE_DEBUG
                 MDLOG__dynamic ("Unqueuing buffer.");
             #endif
 
-            alSourceUnqueueBuffers (MD__file->MDAL__source, 1, &buffer);
-
             MD__lock (MD__file);
+
+            alSourceUnqueueBuffers (MD__file->MDAL__source, 1, &buffer);
 
             if (MD__file->MD__stop_playing) {
                 MD__unlock (MD__file);
@@ -397,6 +403,8 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     while (val == AL_PLAYING) {
 
+        MD__wait_if_paused (MD__file);
+
         MD__lock (MD__file);
         if (MD__file->MD__stop_playing) {
 
@@ -461,6 +469,87 @@ bool MD__did_stop (MD__file_t *MD__file) {
 
     return return_val;
 }
+
+void MD__wait_if_paused (MD__file_t *MD__file) {
+
+    while (true) {
+
+        MD__lock (MD__file);
+
+        if (!MD__file->MD__pause_playing) {
+
+            MD__unlock (MD__file);
+
+            break;
+        }
+        MD__unlock (MD__file);
+    }
+
+    return;
+}
+
+void MD__toggle_pause (MD__file_t *MD__file) {
+
+    #ifdef MDCORE_DEBUG
+        MD__log ("Received pause signal.");
+    #endif
+
+    MD__lock (MD__file);
+
+    if (MD__file->MD__stop_playing) {
+
+        #ifdef MDCORE__DEBUG
+            MD__log ("Ignoring pause signal received during stop process.");
+        #endif
+
+        MD__unlock (MD__file);
+
+        return;
+    }
+
+    MD__file->MD__pause_playing = !MD__file->MD__pause_playing;
+
+    ALuint val;
+
+    if (MD__file->MD__pause_playing) {        
+
+        alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
+
+        if (val == AL_PLAYING) {
+
+
+            #ifdef MDCORE__DEBUG
+                MD__log ("Stop playing due to pause signal.");
+            #endif
+
+            alSourceStop (MD__file->MDAL__source);
+        }
+        else {
+            
+            #ifdef MDCORE__DEBUG
+                MD__log ("Playing already stopped.");
+            #endif
+        }
+    }
+    else {
+
+        alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
+
+        if (val != AL_PLAYING) {
+
+            alSourcePlay (MD__file->MDAL__source);
+        }
+        else {
+
+            #ifdef MDCORE__DEBUG
+                MD__log ("Unpause while already playing (possible bug).");
+            #endif
+        }
+    }
+
+    MD__unlock (MD__file);
+}
+
 
 void MDAL__buff_init (MD__file_t *MD__file) {
 
@@ -913,5 +1002,4 @@ void MD__unlock (MD__file_t *MD__file) {
     #ifdef _WIN32
     ReleaseMutex (MD__file->MD__mutex);
     #endif
-
 }
