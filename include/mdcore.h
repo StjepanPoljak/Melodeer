@@ -75,10 +75,12 @@ struct MD__file {
 
     volatile bool           MD__metadata_loaded;
     volatile bool           MD__decoding_done;
-    volatile bool           MD__is_playing;
 
+    volatile bool           MD__is_playing;
     volatile bool           MD__stop_playing;
     volatile bool           MD__pause_playing;
+
+    unsigned int            MD__seek_sec;
 
     ALuint                  *MDAL__buffers;
     ALuint                  MDAL__source;
@@ -92,12 +94,13 @@ struct MD__file {
 typedef struct MD__file MD__file_t;
 typedef struct MD__general MD__general_t;
 
-void    MD__add_to_buffer            (MD__file_t *MD__file, unsigned char data);
-void    MD__add_to_buffer_raw        (MD__file_t *MD__file, unsigned char data);
-void    MD__add_buffer_chunk_ncp     (MD__file_t *MD__file, unsigned char* data, unsigned int size);
+void    MDAL__initialize            (unsigned int buffer_size,
+                                     unsigned int buffer_num,
+                                     unsigned int pre_buffer);
+void    MDAL__close                 ();
 
-bool    MD__initialize               (MD__file_t *MD__file, char *filename);
-void    MD__clear_buffer             (MD__file_t *MD__file);
+bool    MD__initialize              (MD__file_t *MD__file, char *filename);
+bool    MD__initialize_seek         (MD__file_t *MD__file, char *filename, unsigned int seek_sec);
 
 void    MD__play                    (MD__file_t *MD__file,
                                      MD__RETTYPE decoder_func (MD__ARGTYPE),
@@ -112,6 +115,12 @@ bool    MD__did_stop                (MD__file_t *MD__file);
 void    MD__toggle_pause            (MD__file_t *MD__file);
 bool    MD__is_paused               (MD__file_t *MD__file);
 
+void    MD__add_to_buffer           (MD__file_t *MD__file, unsigned char data);
+void    MD__add_to_buffer_raw       (MD__file_t *MD__file, unsigned char data);
+void    MD__add_buffer_chunk_ncp    (MD__file_t *MD__file, unsigned char* data, unsigned int size);
+
+void    MD__clear_buffer            (MD__file_t *MD__file);
+
 void    MD__decoding_done_signal    (MD__file_t *MD__file);
 void    MD__decoding_error_signal   (MD__file_t *MD__file);
 bool    MD__set_metadata            (MD__file_t *MD__file,
@@ -121,12 +130,6 @@ bool    MD__set_metadata            (MD__file_t *MD__file,
                                      unsigned int total_samples);
 
 void    MD__exit_decoder            ();
-void    MD__deinit                  (MD__file_t *MD__file);
-
-void    MDAL__initialize            (unsigned int buffer_size,
-                                     unsigned int buffer_num,
-                                     unsigned int pre_buffer);
-void    MDAL__close                 ();
 
 void    MD__lock                    (MD__file_t *MD__file);
 void    MD__unlock                  (MD__file_t *MD__file);

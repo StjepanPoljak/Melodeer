@@ -2,6 +2,11 @@
 
 # installs Melodeer development environment
 
+if [ "$EUID" -ne 0 ]
+	then echo "Please run as root (sudo ./install.sh)."
+	exit
+fi
+
 UNAMEOUT="$(uname -s)"
 
 case "${UNAMEOUT}" in

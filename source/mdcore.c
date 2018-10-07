@@ -734,6 +734,21 @@ void MDAL__close () {
     alcCloseDevice          (MD__general.MDAL__device);
 }
 
+bool MD__initialize_seek (MD__file_t *MD__file,
+                          char *filename,
+                          unsigned int seek_sec) {
+
+    bool return_val = MD__initialize (MD__file, filename);
+
+
+    MD__lock (MD__file);
+    MD__file->MD__seek_sec = seek_sec;
+    MD__unlock (MD__file);
+
+    return return_val;
+
+}
+
 bool MD__initialize (MD__file_t *MD__file, char *filename) {
 
     MD__file->filename = filename;
@@ -758,21 +773,23 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
     #endif
 
 
-    MD__file->MD__first_chunk     = NULL;
-    MD__file->MD__current_chunk   = NULL;
-    MD__file->MD__last_chunk      = NULL;
+    MD__file->MD__first_chunk              = NULL;
+    MD__file->MD__current_chunk            = NULL;
+    MD__file->MD__last_chunk               = NULL;
 
     MD__file->MD__metadata.sample_rate     = 0;
     MD__file->MD__metadata.channels        = 0;
     MD__file->MD__metadata.bps             = 0;
     MD__file->MD__metadata.format          = 0;
 
-    MD__file->MD__metadata_loaded = false;
-    MD__file->MD__decoding_done   = false;
-    MD__file->MD__is_playing      = false;
+    MD__file->MD__metadata_loaded          = false;
+    MD__file->MD__decoding_done            = false;
 
-    MD__file->MD__stop_playing    = false;
-    MD__file->MD__pause_playing   = false;
+    MD__file->MD__is_playing               = false;
+    MD__file->MD__stop_playing             = false;
+    MD__file->MD__pause_playing            = false;
+
+    MD__file->MD__seek_sec                 = 0;
 
     #ifdef MDCORE_DEBUG
         MD__log ("MD__file variables reset.");

@@ -20,7 +20,7 @@ mdcore.o : $(srcdir)/mdcore.c $(depsdir)/mdcore.h
 	gcc -c $(srcdir)/mdcore.c -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(MDCOREFLAGS)
 
 main.o: $(srcdir)/main.c
-	-mkdir $(builddir)
+	@-mkdir $(builddir)
 	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(MAINFLAGS)
 
 .PHONY=debug
@@ -41,6 +41,7 @@ uninstall:
 
 .PHONY=shared_common
 shared_common:
+	@./sudo_check.sh "e.g. sudo make shared or sudo make shared_debug" 
 	-mkdir $(builddir)
 
 .PHONY=shared_debug
@@ -63,7 +64,7 @@ shared_internal: mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
 	-mkdir $(incdir)/$(proj)
 	cp $(depsdir)/*.h $(incdir)/$(proj)/
 	-ldconfig
-	-./save.sh
+	@-./save.sh
 
 .PHONY=run
 run: $(proj)

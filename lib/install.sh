@@ -2,6 +2,8 @@
 
 # run with sudo (sudo ./install.sh) to install precompiled Melodeer library
 
+if [ "$EUID" -ne 0 ]; then echo "Please run as root (sudo ./install.sh)."; exit; fi
+
 UNAMEOUT="$(uname -s)"
 
 case "${UNAMEOUT}" in
