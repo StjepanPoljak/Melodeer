@@ -1047,9 +1047,11 @@ void MD__unlock (MD__file_t *MD__file) {
     #endif
 }
 
-void MD__get_logo (char logo[87]) {
+void MD__get_logo (char logo[76]) {
 
     const char *logo_data = "\\          /\n |__    __|\n   _\\/\\/_\n   \\_  _/\n   | /\\ |\n ~melodeer~\n    ||||";
 
-    for (int i=0; i<87; i++) logo[i] = logo_data[i];
+    for (int i=0; i<75; i++) logo[i] = logo_data[i];
+
+    logo[75] = 0;
 }

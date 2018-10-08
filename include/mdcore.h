@@ -137,7 +137,7 @@ void    MD__unlock                  (MD__file_t *MD__file);
 unsigned int    MD__get_buffer_size         (MD__file_t *MD__file);
 unsigned int    MD__get_buffer_num          (MD__file_t *MD__file);
 
-void    MD__get_logo                (char logo[87]);
+void    MD__get_logo                (char logo[76]);
 
 #endif
 
