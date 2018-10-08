@@ -1039,3 +1039,10 @@ void MD__unlock (MD__file_t *MD__file) {
     ReleaseMutex (MD__file->MD__mutex);
     #endif
 }
+
+void MD__get_logo (char logo[87]) {
+
+    const char *logo_data = "\\          /\n |__    __|\n   _\\/\\/_\n   \\_  _/\n   | /\\ |\n ~melodeer~\n    ||||";
+
+    for (int i=0; i<87; i++) logo[i] = logo_data[i];
+}
