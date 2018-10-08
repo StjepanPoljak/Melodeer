@@ -12,7 +12,7 @@ ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
 void    MDAL__clear                 (MD__file_t *MD__file);
 
 void    MD__remove_buffer_head      (MD__file_t *MD__file);
-void    MD__wait_if_paused          (MD__file_t *MD__file);
+bool    MD__wait_if_paused          (MD__file_t *MD__file);
 
 void    (*MD__metadata_fptr)        (MD__metadata_t) = NULL;
 
@@ -311,7 +311,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
         for(int i=0; i<val; i++) {
 
-            MD__wait_if_paused (MD__file);
+            if (MD__wait_if_paused (MD__file)) break;
 
             #ifdef MDCORE_DEBUG
                 MDLOG__dynamic ("Unqueuing buffer.");
@@ -403,7 +403,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
 
     while (val == AL_PLAYING) {
 
-        MD__wait_if_paused (MD__file);
+        bool was_paused = MD__wait_if_paused (MD__file);
 
         MD__lock (MD__file);
         if (MD__file->MD__stop_playing) {
@@ -470,7 +470,14 @@ bool MD__did_stop (MD__file_t *MD__file) {
     return return_val;
 }
 
-void MD__wait_if_paused (MD__file_t *MD__file) {
+bool MD__wait_if_paused (MD__file_t *MD__file) {
+
+    MD__lock (MD__file);
+
+        bool was_paused_or_stopped = MD__file->MD__stop_playing || MD__file->MD__pause_playing;
+   
+    MD__unlock (MD__file);
+
 
     while (true) {
 
@@ -494,7 +501,7 @@ void MD__wait_if_paused (MD__file_t *MD__file) {
         MD__unlock (MD__file);
     }
 
-    return;
+    return was_paused_or_stopped;
 }
 
 void MD__toggle_pause (MD__file_t *MD__file) {

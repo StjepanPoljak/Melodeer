@@ -11,7 +11,7 @@ depsdir = include
 
 $(proj): $(objects) mdcore.o
 	gcc $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o $(proj)
-	-./save.sh
+	@-./save.sh
 
 %.o : $(srcdir)/%.c $(depsdir)/%.h
 	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(OFLAGS)
@@ -46,12 +46,14 @@ shared_common:
 
 .PHONY=shared_debug
 shared_debug: shared_common
-shared_debug: MDCOREFLAGS=-fPIC -D MDCORE_DEBUG
+shared_debug: MDCOREFLAGS=-fPIC -D MDCORE_DEBUG -g
+shared_debug: OFLAGS=-fPIC -g
 shared_debug: shared_internal
 
 .PHONY=shared
 shared: shared_common
 shared: MDCOREFLAGS=-fPIC
+shared: OFLAGS=-fPIC
 shared: shared_internal
 
 .PHONY=shared_install_proc
@@ -65,7 +67,6 @@ shared_install:
 	-ldconfig
 	@-./save.sh
 
-shared_internal: OFLAGS=-fPIC
 shared_internal: mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
 	gcc -shared $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o lib$(proj).so
 	make shared_install
