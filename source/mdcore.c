@@ -518,7 +518,7 @@ void MD__toggle_pause (MD__file_t *MD__file) {
 
     MD__file->MD__pause_playing = !MD__file->MD__pause_playing;
 
-    ALuint val;
+    ALint val;
 
     if (MD__file->MD__pause_playing) {        
 
