@@ -1,6 +1,6 @@
 proj = melodeer
-objects = main.o mdflac.o mdwav.o mdlame.o mdlog.o
-libs = openal FLAC pthread mp3lame
+objects = main.o mdflac.o mdwav.o mdmpg123.o mdlog.o
+libs = openal FLAC pthread mpg123
 libdir = /usr/local/lib
 lib64dir = /lib64
 incdir = /usr/local/include
@@ -67,7 +67,7 @@ shared_install:
 	-ldconfig
 	@-./save.sh
 
-shared_internal: mdcore.o mdflac.o mdwav.o mdlame.o mdlog.o
+shared_internal: mdcore.o mdflac.o mdwav.o mdlog.o mdmpg123.o
 	gcc -shared $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o lib$(proj).so
 	make shared_install
 

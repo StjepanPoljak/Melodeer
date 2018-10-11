@@ -141,16 +141,16 @@ else
 	echo "FLAC is already installed."
 fi
 
-TARGZEXT=".tar.gz"
-LAMEOUT="LAME"
-LAMEURL="https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz"
-LAMELIBRES="$(ls /usr/lib | grep -i lame)"
-LAMELOCLIBRES="$(ls /usr/local/lib | grep -i lame)"
+TARGZEXT=".tar.bz"
+MPG123OUT="MPG123"
+MPG123URL="https://downloads.sourceforge.net/project/mpg123/mpg123/1.25.10/mpg123-1.25.10.tar.bz2"
+MPG123LIBRES="$(ls /usr/lib | grep -i mpg123)"
+MPG123LOCLIBRES="$(ls /usr/local/lib | grep -i mpg123)"
 
-if [ "$LAMELIBRES" = "" ] && [ "$LAMELOCLIBRES" = "" ] && [ ! -d "/usr/local/include/LAME" ]
+if [ "$MPG123LIBRES" = "" ] && [ "$MPG123LOCLIBRES" = "" ] && [ ! -f "/usr/local/include/mpg123.h" ]
 then
 
-	echo "Attempting to install LAME."
+	echo "Attempting to install mpg123."
 
 	if [ ! -f "/usr/bin/make" ] && [ ! -f "/usr/local/bin/make" ]
 	then
@@ -158,26 +158,26 @@ then
 		exit
 	fi
 
-	if [ -d "$(pwd)/install/lame-3.100" ]
+	if [ -d "$(pwd)/install/mpg123-1.25.10" ]
 	then
-		rm -rf "$(pwd)/install/lame-3.100"
+		rm -rf "$(pwd)/install/mpg123-1.25.10"
 	fi
 
-	if [ ! -f "$(pwd)/$LAMEOUT" ]
+	if [ ! -f "$(pwd)/$MPG123OUT" ]
 	then
 		if [ "$MACHINE" = "Mac" ]
 		then
-			curl -o "$LAMEOUT$TARGZEXT" "$LAMEURL"
+			curl -o "$MPG123OUT$TARGZEXT" "$MPG123URL"
 		else
-			wget -O "$LAMEOUT$TARGZEXT" "$LAMEURL"
+			wget -O "$MPG123OUT$TARGZEXT" "$MPG123URL"
 		fi
 	fi
 
-	tar xvf "$LAMEOUT$TARGZEXT" -C "$(pwd)/install/"
+	tar xvf "$MPG123OUT$TARGZEXT" -C "$(pwd)/install/"
 
-	(cd "install/lame-3.100"; ./configure && make && make install)
+	(cd "install/mpg123-1.25.10"; ./configure && make && make install)
 else
-	echo "LAME is already installed."
+	echo "mpg123 is already installed."
 fi
 
 if [ -d "install" ]
@@ -195,9 +195,9 @@ then
 	rm "$FLACOUT$ZIPEXT"
 fi
 
-if [ -f "$LAMEOUT$TARGZEXT" ]
+if [ -f "$MPG123OUT$TARGZEXT" ]
 then
-	rm "$LAMEOUT$TARGZEXT"
+	rm "$MPG123OUT$TARGZEXT"
 fi
 
 exit

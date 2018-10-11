@@ -4,7 +4,7 @@
 #include "mdcore.h"
 #include "mdflac.h"
 #include "mdwav.h"
-#include "mdlame.h"
+#include "mdmpg123.h"
 
 enum MD__filetype { MD__FLAC, MD__WAV, MD__MP3, MD__UNKNOWN };
 
@@ -64,7 +64,7 @@ int main (int argc, char *argv[])
                     break;
 
                 case MD__MP3:
-                    decoder = MDLAME__decoder;
+                    decoder = MDMPG123__decoder;
                     break;
 
                 default:
