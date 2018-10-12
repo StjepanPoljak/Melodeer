@@ -41,4 +41,6 @@ void *MDMPG123__decoder (void *MD__file) {
     mpg123_exit();
 
     MD__exit_decoder ();
+
+    return NULL;
 }

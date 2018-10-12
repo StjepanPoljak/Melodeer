@@ -36,14 +36,7 @@ then
 		exit
 	fi
 
-	OPENALBREWCHECK="$(brew ls --versions openal-soft)"
-
-	if [ "$OPENALBREWCHECK" = "" ]
-	then
-		brew install openal-soft
-	else
-		echo "OpenAL is already installed."
-	fi
+	sudo -u nobody brew install openal-soft
 
 else
 	OPENALLIBRES="$(ls /usr/lib | grep -i openal)"
@@ -141,43 +134,56 @@ else
 	echo "FLAC is already installed."
 fi
 
-TARGZEXT=".tar.bz"
+TARGZEXT=".tar.bz2"
 MPG123OUT="MPG123"
 MPG123URL="https://downloads.sourceforge.net/project/mpg123/mpg123/1.25.10/mpg123-1.25.10.tar.bz2"
 MPG123LIBRES="$(ls /usr/lib | grep -i mpg123)"
 MPG123LOCLIBRES="$(ls /usr/local/lib | grep -i mpg123)"
 
-if [ "$MPG123LIBRES" = "" ] && [ "$MPG123LOCLIBRES" = "" ] && [ ! -f "/usr/local/include/mpg123.h" ]
+if [ "$MACHINE" = "Mac" ]
 then
 
-	echo "Attempting to install mpg123."
-
-	if [ ! -f "/usr/bin/make" ] && [ ! -f "/usr/local/bin/make" ]
+	if [ ! -f "/usr/bin/brew" ] && [ ! -f "/usr/local/bin/brew" ]
 	then
-		echo "(!) Please install make."
+		echo "(!) Homebrew not installed. Please install Homebrew and try again."
 		exit
 	fi
 
-	if [ -d "$(pwd)/install/mpg123-1.25.10" ]
-	then
-		rm -rf "$(pwd)/install/mpg123-1.25.10"
-	fi
+	sudo -u nobody brew install mpg123
 
-	if [ ! -f "$(pwd)/$MPG123OUT" ]
-	then
-		if [ "$MACHINE" = "Mac" ]
-		then
-			curl -o "$MPG123OUT$TARGZEXT" "$MPG123URL"
-		else
-			wget -O "$MPG123OUT$TARGZEXT" "$MPG123URL"
-		fi
-	fi
-
-	tar xvf "$MPG123OUT$TARGZEXT" -C "$(pwd)/install/"
-
-	(cd "install/mpg123-1.25.10"; ./configure && make && make install)
 else
-	echo "mpg123 is already installed."
+	if [ "$MPG123LIBRES" = "" ] && [ "$MPG123LOCLIBRES" = "" ] && [ ! -f "/usr/local/include/mpg123.h" ]
+	then
+
+		echo "Attempting to install mpg123."
+
+		if [ ! -f "/usr/bin/make" ] && [ ! -f "/usr/local/bin/make" ]
+		then
+			echo "(!) Please install make."
+			exit
+		fi
+
+		if [ -d "$(pwd)/install/mpg123-1.25.10" ]
+		then
+			rm -rf "$(pwd)/install/mpg123-1.25.10"
+		fi
+
+		if [ ! -f "$(pwd)/$MPG123OUT" ]
+		then
+			if [ "$MACHINE" = "Mac" ]
+			then
+				curl -o "$MPG123OUT$TARGZEXT" "$MPG123URL"
+			else
+				wget -O "$MPG123OUT$TARGZEXT" "$MPG123URL"
+			fi
+		fi
+
+		tar xvf "$MPG123OUT$TARGZEXT" -C "$(pwd)/install/"
+
+		(cd "install/mpg123-1.25.10"; ./configure && make && make install)
+	else
+		echo "mpg123 is already installed."
+	fi
 fi
 
 if [ -d "install" ]
