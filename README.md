@@ -5,17 +5,16 @@ Melodeer is envisioned as a high-level cross-platform API dedicated to, not only
 
 Melodeer should enable programmers to choose only formats in which they are interested. For example, if somebody wants a pure FLAC player library, he would need only mdcore.c and mdflac.c (along with .h files).
 
-In order to build Melodeer, following libraries are needed (with respect to wanted modules):
+In order to build Melodeer, following libraries are needed (customizable by tinkering Makefile):
 
 * mdcore
 
-  - OpenAL library (https://www.openal.org)
+  - OpenAL library (https://github.com/kcat/openal-soft)
 
 * mdflac
 
-  - OGG library (https://github.com/gcp/libogg)
   - FLAC library (https://github.com/xiph/flac)
 
-* mdlame
+* mdmpg123
 
-  - LAME library (http://lame.sourceforge.net)
+  - mpg123 library (https://sourceforge.net/projects/mpg123/files/)
