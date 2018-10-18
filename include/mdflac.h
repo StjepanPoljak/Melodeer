@@ -1,3 +1,5 @@
+#ifndef MDFLAC_H
+
 #include "FLAC/stream_decoder.h"
 
 void *MDFLAC__start_decoding (void *MD__file);
@@ -12,5 +14,9 @@ static void MDFLAC__metadata_callback (const FLAC__StreamDecoder  *decoder,
                                        void                       *client_data);
 
 static void MDFLAC__error_callback (const FLAC__StreamDecoder         *decoder,
-                                  FLAC__StreamDecoderErrorStatus    status,
-                                  void                              *client_data);
+                                    FLAC__StreamDecoderErrorStatus    status,
+                                    void                              *client_data);
+
+#endif
+
+#define MDFLAC_H

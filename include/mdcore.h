@@ -1,5 +1,9 @@
 #ifndef MDCORE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -138,6 +142,10 @@ unsigned int    MD__get_buffer_size         (MD__file_t *MD__file);
 unsigned int    MD__get_buffer_num          (MD__file_t *MD__file);
 
 void    MD__get_logo                (char logo[76]);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

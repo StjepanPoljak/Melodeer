@@ -1,4 +1,4 @@
-#ifndef MDLOG
+#ifndef MDLOG_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,4 +21,4 @@ void    MDLOG__remove_last_line ();
 
 #endif
 
-#define MDLOG
+#define MDLOG_H

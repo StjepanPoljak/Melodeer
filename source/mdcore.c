@@ -6,12 +6,12 @@
 
 MD__general_t MD__general;
 
-void    MDAL__buff_init             (MD__file_t *MD__file);
+void    MDAL__buff_init              (MD__file_t *MD__file);
 void    MDAL__pop_error             (char *message, int code);
 ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
 void    MDAL__clear                 (MD__file_t *MD__file);
 
-void    MD__remove_buffer_head      (MD__file_t *MD__file);
+void    MD__remove_buffer_head       (MD__file_t *MD__file);
 bool    MD__wait_if_paused          (MD__file_t *MD__file);
 
 void    (*MD__metadata_fptr)        (MD__metadata_t) = NULL;
@@ -254,7 +254,6 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             continue;
         }
 
-        // the && !MD__file->MD__stop_playing, etc... is only to make signal fall through to if below
         if ((!MD__file->MD__current_chunk->next && MD__file->MD__decoding_done)
         || MD__file->MD__stop_playing) {
 
@@ -475,7 +474,7 @@ bool MD__wait_if_paused (MD__file_t *MD__file) {
     MD__lock (MD__file);
 
         bool was_paused_or_stopped = MD__file->MD__stop_playing || MD__file->MD__pause_playing;
-   
+
     MD__unlock (MD__file);
 
 
@@ -527,7 +526,7 @@ void MD__toggle_pause (MD__file_t *MD__file) {
 
     ALint val;
 
-    if (MD__file->MD__pause_playing) {        
+    if (MD__file->MD__pause_playing) {
 
         alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
 
@@ -541,7 +540,7 @@ void MD__toggle_pause (MD__file_t *MD__file) {
             alSourceStop (MD__file->MDAL__source);
         }
         else {
-            
+
             #ifdef MDCORE__DEBUG
                 MD__log ("Playing already stopped.");
             #endif
@@ -764,7 +763,7 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
         MD__log ("Opening file: %s.", filename);
     #endif
 
-    MD__file->file = fopen(filename,"rb");
+    MD__file->file = fopen (filename,"rb");
 
     if (MD__file->file == NULL) {
 
@@ -780,7 +779,7 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
     #endif
 
 
-    MD__file->MD__first_chunk              = NULL;
+    MD__file->MD__first_chunk               = NULL;
     MD__file->MD__current_chunk            = NULL;
     MD__file->MD__last_chunk               = NULL;
 

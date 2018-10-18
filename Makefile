@@ -1,6 +1,6 @@
 proj = melodeer
-objects = main.o mdflac.o mdwav.o mdmpg123.o mdlog.o
-libs = openal FLAC pthread mpg123
+objects = main.o mdflac.o mdwav.o mdmpg123.o mdlog.o mdutils.o
+libs = openal FLAC pthread mpg123 m
 libdir = /usr/local/lib
 lib64dir = /lib64
 incdir = /usr/local/include
@@ -41,7 +41,7 @@ uninstall:
 
 .PHONY=shared_common
 shared_common:
-	@./sudo_check.sh "e.g. sudo make shared or sudo make shared_debug" 
+	@./sudo_check.sh "e.g. sudo make shared or sudo make shared_debug"
 	-mkdir $(builddir)
 
 .PHONY=shared_debug
@@ -57,7 +57,7 @@ shared: OFLAGS=-fPIC
 shared: shared_internal
 
 .PHONY=shared_install_proc
-shared_install: 
+shared_install:
 	-cp lib$(proj).so $(lib64dir)/
 	mv lib$(proj).so $(libdir)/
 	chmod 0755 $(libdir)/lib$(proj).so
@@ -67,7 +67,7 @@ shared_install:
 	-ldconfig
 	@-./save.sh
 
-shared_internal: mdcore.o mdflac.o mdwav.o mdlog.o mdmpg123.o
+shared_internal: mdcore.o mdflac.o mdwav.o mdlog.o mdmpg123.o mdutils.o
 	gcc -shared $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o lib$(proj).so
 	make shared_install
 
