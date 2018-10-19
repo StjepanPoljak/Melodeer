@@ -461,6 +461,10 @@ void MD__stop (MD__file_t *MD__file) {
     MD__lock (MD__file);
     MD__file->MD__stop_playing = true;
     MD__unlock (MD__file);
+
+    #ifdef MDCORE_DEBUG
+        MD__log ("Sending stop signal...");
+    #endif
 }
 
 bool MD__did_stop (MD__file_t *MD__file) {
