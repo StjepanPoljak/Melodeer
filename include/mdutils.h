@@ -9,6 +9,13 @@ enum MD__filetype { MD__FLAC, MD__WAV, MD__MP3, MD__UNKNOWN };
 
 typedef enum MD__filetype MD__filetype;
 
+bool MD__play_raw_with_decoder (MD__file_t *MD__file,
+                                void (*metadata_handle) (MD__metadata_t, void *),
+                                void (*playing_handle) (void *),
+                                void (*error_handle) (char *, void *),
+                                void (*buffer_underrun_handle) (void *),
+                                void (*completion_handle) (void *));
+
 MD__filetype MD__get_extension (const char *filename);
 
 MD__filetype MD__get_filetype (const char *filename);

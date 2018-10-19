@@ -6,20 +6,25 @@
 
 MD__general_t MD__general;
 
-void    MDAL__buff_init              (MD__file_t *MD__file);
-void    MDAL__pop_error             (char *message, int code);
-ALenum  MDAL__get_format            (unsigned int channels, unsigned int bps);
-void    MDAL__clear                 (MD__file_t *MD__file);
+// private helper procedures
 
-void    MD__remove_buffer_head       (MD__file_t *MD__file);
-bool    MD__wait_if_paused          (MD__file_t *MD__file);
+void        MDAL__buff_init             (MD__file_t *MD__file);
+void        MDAL__pop_error             (char *message, int code);
+ALenum      MDAL__get_format            (unsigned int channels, unsigned int bps);
+void        MDAL__clear                 (MD__file_t *MD__file);
 
-void    (*MD__metadata_fptr)        (MD__metadata_t) = NULL;
+void        MD__remove_buffer_head      (MD__file_t *MD__file);
+bool        MD__wait_if_paused          (MD__file_t *MD__file);
 
-void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
-               void (*metadata_handle) (MD__metadata_t), void (*playing_handle) (),
-               void (*error_handle) (char *), void (*buffer_underrun_handle) (),
-               void (*completion) (void)) {
+void        (*MD__metadata_fptr)        (MD__metadata_t, void *) = NULL;
+
+void MD__play_raw (MD__file_t *MD__file,
+                   MD__RETTYPE decoder_func (MD__ARGTYPE),
+                   void (*metadata_handle) (MD__metadata_t, void *),
+                   void (*playing_handle) (void *),
+                   void (*error_handle) (char *, void *),
+                   void (*buffer_underrun_handle) (void *),
+                   void (*completion_handle) (void *)) {
 
     #ifdef MDCORE_DEBUG
         MD__log ("---------- MD__play called ----------");
@@ -33,7 +38,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             MD__log (message);
         #endif
 
-        if (error_handle) error_handle (message);
+        if (error_handle) error_handle (message, MD__file->user_data);
         return;
     }
 
@@ -45,7 +50,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             MD__log (message);
         #endif
 
-        if (error_handle) error_handle (message);
+        if (error_handle) error_handle (message, MD__file->user_data);
 
         return;
     }
@@ -66,7 +71,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
             MD__log (message);
         #endif
 
-        if (error_handle) error_handle (message);
+        if (error_handle) error_handle (message, MD__file->user_data);
 
         #ifdef MDCORE_DEBUG
             MD__log("Closing OpenAL.");
@@ -94,7 +99,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
     if (!decoder_thread) {
 
         MDAL__close ();
-        if (error_handle) error_handle ("Error creating thread.");
+        if (error_handle) error_handle ("Error creating thread.", MD__file->user_data);
         exit(41);
     }
 
@@ -227,7 +232,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         MD__log ("Playing.");
     #endif
 
-    if (playing_handle) playing_handle ();
+    if (playing_handle) playing_handle (MD__file->user_data);
 
     ALuint buffer;
     ALint val;
@@ -284,7 +289,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
                 MD__log ("Buffer underrun.");
             #endif
 
-            if (buffer_underrun_handle) buffer_underrun_handle ();
+            if (buffer_underrun_handle) buffer_underrun_handle (MD__file->user_data);
 
             #ifdef MDCORE_DEBUG
                 MD__log ("Attempting to resume playing.");
@@ -435,7 +440,7 @@ void MD__play (MD__file_t *MD__file, MD__RETTYPE decoder_func (MD__ARGTYPE),
         MD__log ("Done playing.");
     #endif
 
-    if (completion) completion ();
+    if (completion_handle) completion_handle (MD__file->user_data);
 
     #ifdef MDCORE_DEBUG
         MD__log ("Joining threads.");
@@ -757,6 +762,13 @@ bool MD__initialize_seek (MD__file_t *MD__file,
 
 bool MD__initialize (MD__file_t *MD__file, char *filename) {
 
+    return MD__initialize_with_user_data (MD__file, filename, NULL);
+}
+
+bool MD__initialize_with_user_data (MD__file_t *MD__file, char *filename, void *user_data) {
+
+    if (user_data) MD__file->user_data = user_data;
+
     MD__file->filename = filename;
 
     #ifdef MDCORE_DEBUG
@@ -778,8 +790,7 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
         MD__log ("Resetting MD__file variables.");
     #endif
 
-
-    MD__file->MD__first_chunk               = NULL;
+    MD__file->MD__first_chunk              = NULL;
     MD__file->MD__current_chunk            = NULL;
     MD__file->MD__last_chunk               = NULL;
 
@@ -796,11 +807,11 @@ bool MD__initialize (MD__file_t *MD__file, char *filename) {
     MD__file->MD__pause_playing            = false;
 
     MD__file->MD__seek_sec                 = 0;
+    MD__file->MD__buffer_transform         = NULL;
 
     #ifdef MDCORE_DEBUG
         MD__log ("MD__file variables reset.");
     #endif
-
 
     return true;
 }
@@ -853,14 +864,20 @@ void MD__remove_buffer_head (MD__file_t *MD__file) {
     return;
 }
 
-void MD__add_to_buffer (MD__file_t *MD__file, unsigned char data) {
+bool MD__add_to_buffer (MD__file_t *MD__file, unsigned char data) {
+
+    bool result = true;
 
     MD__lock (MD__file);
-    MD__add_to_buffer_raw (MD__file, data);
+    result = MD__add_to_buffer_raw (MD__file, data);
     MD__unlock (MD__file);
+
+    return result;
 }
 
-void MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
+bool MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
+
+    if (MD__file->MD__stop_playing) return false;
 
     if ((MD__file->MD__last_chunk) && (MD__file->MD__last_chunk->size < MD__general.MD__buff_size))
 
@@ -900,9 +917,13 @@ void MD__add_to_buffer_raw (MD__file_t *MD__file, unsigned char data) {
             MD__file->MD__last_chunk = new_chunk;
         }
     }
+
+    return true;
 }
 
-void MD__add_buffer_chunk_ncp (MD__file_t *MD__file, unsigned char* data, unsigned int size) {
+bool MD__add_buffer_chunk_ncp (MD__file_t *MD__file, unsigned char* data, unsigned int size) {
+
+    if (MD__did_stop (MD__file)) return false;
 
     MD__buffer_chunk_t *new_chunk = malloc (sizeof (MD__buffer_chunk_t));
     new_chunk->chunk = data;
@@ -929,6 +950,8 @@ void MD__add_buffer_chunk_ncp (MD__file_t *MD__file, unsigned char* data, unsign
         MD__file->MD__last_chunk->next = new_chunk;
         MD__file->MD__last_chunk = new_chunk;
     }
+
+    return true;
 }
 
 
@@ -1001,7 +1024,7 @@ bool MD__set_metadata (MD__file_t *MD__file,
         return false;
     }
 
-    if (MD__metadata_fptr) MD__metadata_fptr (MD__file->MD__metadata);
+    if (MD__metadata_fptr) MD__metadata_fptr (MD__file->MD__metadata, MD__file->user_data);
 
     #ifdef MDCORE_DEBUG
         MD__log ("Metadata set and dispatched.");

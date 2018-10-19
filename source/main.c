@@ -7,21 +7,21 @@
 #include "mdwav.h"
 #include "mdmpg123.h"
 
-void MD__handle_metadata (MD__metadata_t metadata);
+void MD__handle_metadata (MD__metadata_t metadata, void *);
 
 void transform (volatile MD__buffer_chunk_t *curr_chunk,
                 unsigned int sample_rate,
                 unsigned int channels,
                 unsigned int bps);
 
-void MD__handle_errors (char *info);
+void MD__handle_errors (char *info, void *data);
 
-void MD__completion () {
+void MD__completion (void *data) {
 
     printf("Done playing!\n");
 }
 
-void MD__playing_handle () {
+void MD__playing_handle (void *data) {
 
     printf("Playing!\n");
 }
@@ -67,8 +67,8 @@ int main (int argc, char *argv[])
                     break;
                 }
 
-            MD__play (&MD__file, decoder, MD__handle_metadata,
-                      MD__playing_handle, MD__handle_errors, NULL, MD__completion);
+            MD__play_raw (&MD__file, decoder, MD__handle_metadata,
+                          MD__playing_handle, MD__handle_errors, NULL, MD__completion);
         }
     }
 
@@ -77,12 +77,12 @@ int main (int argc, char *argv[])
     return 0;
 }
 
-void MD__handle_errors (char *info) {
+void MD__handle_errors (char *info, void *data) {
 
     printf("(!) %s\n",info);
 }
 
-void MD__handle_metadata (MD__metadata_t metadata) {
+void MD__handle_metadata (MD__metadata_t metadata, void *data) {
 
     unsigned int total_seconds  = metadata.total_samples / metadata.sample_rate;
     unsigned int hours          = total_seconds / 3600;

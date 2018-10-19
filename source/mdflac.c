@@ -66,17 +66,20 @@ void MDFLAC__error_callback (const FLAC__StreamDecoder          *MDFLAC__decoder
 
 	(void)MDFLAC__decoder, (void)client_data;
 
-    MD__decoding_error_signal ((MD__file_t *)client_data);
-
     #ifdef MDCORE__DEBUG
         MD__log ("Got error callback: %s\n", FLAC__StreamDecoderErrorStatusString[status]);
     #endif
+
+    MD__decoding_error_signal ((MD__file_t *)client_data);
+    MD__exit_decoder ();
 }
 
 static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__StreamDecoder     *MDFLAC__decoder,
                                                               const FLAC__Frame             *frame,
                                                               const FLAC__int32 *const      buffer[],
                                                               void                          *client_data) {
+    MD__file_t *MD__file = (MD__file_t *)client_data;
+
     unsigned int bps_supp = 16;
 
     unsigned int bps_mult = ((frame->header.bits_per_sample < bps_supp)
@@ -96,20 +99,23 @@ static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__Stream
 
     for (unsigned int i = 0; i < frame->header.blocksize; i++) {
 
-        if (MD__did_stop ((MD__file_t *) client_data)) return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+        if (MD__did_stop (MD__file)) return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
 
-        MD__lock ((MD__file_t *)client_data);
+        MD__lock (MD__file);
         for (int c = 0; c < frame->header.channels; c++) {
 
             for (int b = 0; b < bps_mult; b++ ) {
 
-                MD__add_to_buffer_raw ((MD__file_t *)client_data,
-                                      (unsigned char)((buffer [c] [i]
-                                                        >> (8 * compress))
-                                                        >> (8 * b)));
+                if (!MD__add_to_buffer_raw (MD__file, (unsigned char)((buffer [c] [i]
+                                                                       >> (8 * compress))
+                                                                       >> (8 * b)))) {
+                    MD__unlock (MD__file);
+
+                    return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+                }
             }
         }
-        MD__unlock ((MD__file_t *)client_data);
+        MD__unlock (MD__file);
     }
 
     return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;

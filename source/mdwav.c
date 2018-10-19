@@ -10,18 +10,20 @@ void MDWAV__error (MD__file_t *MD__file, char *message) {
     MD__exit_decoder ();
 }
 
-void *MDWAV__parse (void *MD__file)
+void *MDWAV__parse (void *data)
 {
+    MD__file_t *MD__file = (MD__file_t *)data;
+
     unsigned int channels = 0;
     unsigned int bits = 0;
     unsigned int frequency = 0;
 
     unsigned char *buffer;
-    unsigned int buff_size = MD__get_buffer_size ((MD__file_t *)MD__file);
+    unsigned int buff_size = MD__get_buffer_size (MD__file);
 
     buffer = malloc (4);
 
-    FILE *file = ((MD__file_t *)MD__file)->file;
+    FILE *file = MD__file->file;
 
     int temp_read_res = 0;
 
@@ -33,7 +35,7 @@ void *MDWAV__parse (void *MD__file)
      || buffer[2] != 'F'
      || buffer[3] != 'F') {
 
-        MDWAV__error ((MD__file_t *)MD__file, "No RIFF identifier.");
+        MDWAV__error (MD__file, "No RIFF identifier.");
     }
 
     // 5-8 size
@@ -52,7 +54,7 @@ void *MDWAV__parse (void *MD__file)
      || buffer[2] != 'V'
      || buffer[3] != 'E') {
 
-        MDWAV__error ((MD__file_t *)MD__file, "No WAVE identifier.\n");
+        MDWAV__error (MD__file, "No WAVE identifier.\n");
     }
 
     // 13-16 'fmt '
@@ -62,7 +64,7 @@ void *MDWAV__parse (void *MD__file)
      || buffer [2] != 't'
      || buffer [3] != ' ') {
 
-        MDWAV__error ((MD__file_t *)MD__file, "Error: No fmt marker.");
+        MDWAV__error (MD__file, "Error: No fmt marker.");
     }
 
     // 17-20 fmt length
@@ -78,7 +80,7 @@ void *MDWAV__parse (void *MD__file)
      || buffer[0] != 1) {
 
         printf ("Error: Unsupported format.\n");
-        MD__decoding_error_signal ((MD__file_t *)MD__file);
+        MD__decoding_error_signal (MD__file);
         MD__exit_decoder ();
     }
 
@@ -127,7 +129,7 @@ void *MDWAV__parse (void *MD__file)
      || buffer[3] != 'a') {
 
         printf ("No data marker.\n");
-        MD__decoding_error_signal ((MD__file_t *)MD__file);
+        MD__decoding_error_signal (MD__file);
         MD__exit_decoder ();
     }
 
@@ -138,14 +140,14 @@ void *MDWAV__parse (void *MD__file)
                            | buffer [1] << 8
                            | buffer [0];
 
-    MD__set_metadata ((MD__file_t *)MD__file, frequency, channels, bits, (data_size / channels * 8) / bits);
+    MD__set_metadata (MD__file, frequency, channels, bits, (data_size / channels * 8) / bits);
 
     unsigned char *metatemp = buffer;
     unsigned int done_processing = 0;
 
     while (true) {
 
-        if (done_processing >= data_size || MD__did_stop ((MD__file_t *)MD__file)) break;
+        if (done_processing >= data_size || MD__did_stop (MD__file)) break;
 
         if (bits <= 16 || !MDWAV__compress) {
             // this will be freed by the buffer algorithm, so no worries
@@ -153,7 +155,7 @@ void *MDWAV__parse (void *MD__file)
 
             unsigned int read_size = fread (buffer, 1, buff_size, file);
 
-            MD__add_buffer_chunk_ncp ((MD__file_t *)MD__file, buffer, read_size);
+            if (!MD__add_buffer_chunk_ncp (MD__file, buffer, read_size)) break;
             done_processing += read_size;
 
         } else {
@@ -166,7 +168,7 @@ void *MDWAV__parse (void *MD__file)
     fclose (file);
     free (metatemp);
 
-    MD__decoding_done_signal ((MD__file_t *)MD__file);
+    MD__decoding_done_signal (MD__file);
     MD__exit_decoder ();
 
     return NULL;
