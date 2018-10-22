@@ -27,9 +27,11 @@ void *MDMPG123__decoder (void *data) {
         MD__exit_decoder ();
     }
 
+    mpg123_scan (mh);
+
     mpg123_getformat (mh, &rate, &channels, &encoding);
 
-    MD__set_metadata (MD__file, (int) rate, channels, MPG123_SAMPLESIZE (encoding) * 8, 0);
+    MD__set_metadata (MD__file, (int) rate, channels, MPG123_SAMPLESIZE (encoding) * 8, mpg123_length (mh));
 
     unsigned int counter = 0;
     
