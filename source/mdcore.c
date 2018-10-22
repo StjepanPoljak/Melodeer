@@ -179,7 +179,8 @@ void MD__play_raw (MD__file_t *MD__file,
             MD__file->MD__buffer_transform (MD__file->MD__current_chunk,
                                           MD__file->MD__metadata.sample_rate,
                                           MD__file->MD__metadata.channels,
-                                          MD__file->MD__metadata.bps);
+                                          MD__file->MD__metadata.bps,
+                                          MD__file->user_data);
 
         #ifdef MDCORE_DEBUG
           MDLOG__dynamic ("Loading chunk no. %lu with size %lu (out of %lu loaded chunks).",
@@ -341,7 +342,8 @@ void MD__play_raw (MD__file_t *MD__file,
                 MD__file->MD__buffer_transform (MD__file->MD__current_chunk,
                                               MD__file->MD__metadata.sample_rate,
                                               MD__file->MD__metadata.channels,
-                                              MD__file->MD__metadata.bps);
+                                              MD__file->MD__metadata.bps,
+                                              MD__file->user_data);
 
             #ifdef MDCORE_DEBUG
                 MDLOG__dynamic ("Loading chunk no. %lu with size %lu (out of %lu loaded chunks).",
@@ -811,7 +813,7 @@ bool MD__initialize_with_user_data (MD__file_t *MD__file, char *filename, void *
     MD__file->MD__pause_playing            = false;
 
     MD__file->MD__seek_sec                 = 0;
-    MD__file->MD__buffer_transform         = NULL;
+    MD__file->MD__buffer_transform          = NULL;
 
     #ifdef MDCORE_DEBUG
         MD__log ("MD__file variables reset.");
