@@ -74,13 +74,17 @@ void MDFFT__bit_reverse_copy (float complex v_in[], float complex v_out[], int c
 void MDFFT__to_amp_surj (float complex v_in[], unsigned int count_in,
                          float v_out[], unsigned int count_out) {
 
-    unsigned int ratio = count_in / count_out;
+// count_in = 128
+// count_out = 8
+// ratio = 16
+
+    int ratio = count_in / count_out;
 
     for (int i=0; i<count_out; i++) {
 
         v_out[i] = 0;
 
-        for (int j=0; j<ratio*i; j++) v_out[i] += cabs (v_in[i+j]);
+        for (int j=0; j<ratio; j++) v_out[i] += cabs (v_in[i*ratio+j]) / ratio;
     }
 }
 
@@ -123,7 +127,7 @@ void MDFFT__apply_hanning (float complex v[], unsigned int count) {
 
 void tests () {
 
-    float complex *v_in = malloc(8*sizeof(v_in));
+    float complex *v_in = malloc(8*sizeof(*v_in));
     float complex v_out[8];
 
     for (int i=0; i<8; i++) {
@@ -139,14 +143,21 @@ void tests () {
         printf("[%d] = %.4f+%.4fi\n", i, creal(v_out[i]), cimag(v_out[i]));
     }
 
-    float complex v_in2[8];
+    float *res = malloc(2*sizeof(*res));
 
-    MDFFT__iterative(true, v_out, v_in2, 8);
+    MDFFT__to_amp_surj(v_out, 8, res, 2);
 
-    for(int i=0; i<8; i++) {
+    printf("%02.2f, %02.2f\n", res[0], res[1]);
 
-        printf("%.4f+%.4fi\n", creal(v_in2[i]), cimag(v_in2[i]));
-    }
+    //
+    // float complex v_in2[8];
+    //
+    // MDFFT__iterative(true, v_out, v_in2, 8);
+    //
+    // for(int i=0; i<8; i++) {
+    //
+    //     printf("%.4f+%.4fi\n", creal(v_in2[i]), cimag(v_in2[i]));
+    // }
 }
 
 unsigned int MD__get_curr_seconds (MD__file_t *MD__file) {

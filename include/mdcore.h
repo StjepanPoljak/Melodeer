@@ -92,9 +92,10 @@ struct MD__file {
     void                    *user_data;
 
     void (*MD__buffer_transform)    (volatile MD__buffer_chunk_t *curr_chunk,
-                                     unsigned int sample_rate,
-                                     unsigned int channels,
-                                     unsigned int bps);
+                                    unsigned int sample_rate,
+                                    unsigned int channels,
+                                    unsigned int bps,
+                                    void *user_data);
 };
 
 typedef struct MD__file MD__file_t;

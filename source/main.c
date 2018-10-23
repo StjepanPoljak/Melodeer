@@ -12,7 +12,8 @@ void MD__handle_metadata (MD__metadata_t metadata, void *);
 void transform (volatile MD__buffer_chunk_t *curr_chunk,
                 unsigned int sample_rate,
                 unsigned int channels,
-                unsigned int bps);
+                unsigned int bps,
+                void *user_data);
 
 void MD__handle_errors (char *info, void *data);
 
@@ -26,8 +27,8 @@ void MD__playing_handle (void *data) {
     printf("Playing!\n");
 }
 
-int main (int argc, char *argv[])
-{
+int main (int argc, char *argv[]) {
+
     tests();
 
     return 0;
@@ -111,7 +112,8 @@ void MD__handle_metadata (MD__metadata_t metadata, void *data) {
 void transform (volatile MD__buffer_chunk_t *curr_chunk,
                 unsigned int sample_rate,
                 unsigned int channels,
-                unsigned int bps) {
+                unsigned int bps,
+                void *user_data) {
 
     for (int i=0; i<curr_chunk->size/((bps/8)*channels); i++)
 
