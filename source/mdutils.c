@@ -84,7 +84,14 @@ void MDFFT__to_amp_surj (float complex v_in[], unsigned int count_in,
 
         v_out[i] = 0;
 
-        for (int j=0; j<ratio; j++) v_out[i] += cabs (v_in[i*ratio+j]) / ratio;
+        for (int j=0; j<ratio; j++) {
+            
+            // try this for maximum
+            //float curr = cabs (v_in[i*ratio+j]);
+            //if (curr > v_out[i]) v_out[i] = curr;
+            
+            v_out[i] += cabs (v_in[i*ratio+j]) / ratio;
+        }
     }
 }
 
