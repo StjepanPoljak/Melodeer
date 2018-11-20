@@ -35,7 +35,8 @@ bool MD__play_raw_with_decoder (MD__file_t *MD__file,
         return false;
     }
 
-    MD__play_raw (MD__file, decoder, metadata_handle, playing_handle, error_handle, buffer_underrun_handle, completion_handle);
+    MD__play_raw (MD__file, decoder, metadata_handle, playing_handle,
+                  error_handle, buffer_underrun_handle, completion_handle);
 
     return true;
 }
@@ -49,7 +50,23 @@ unsigned int MDFFT__lg_uint (unsigned int num) {
     return log_res;
 }
 
+#define MD__BIT_REVERSE_PRECALC_MAX 128
+
 unsigned int MDFFT__bit_reverse (unsigned int num, unsigned int bits) {
+
+    static unsigned int bit_rev_table[MD__BIT_REVERSE_PRECALC_MAX];
+    static bool bit_rev_table_assigned[MD__BIT_REVERSE_PRECALC_MAX];
+
+    static unsigned int bits_precalc = 0;
+
+    if (bits_precalc != bits) {
+        
+        bits_precalc = bits;
+
+        for (int i=0; i<bits_precalc; i++) bit_rev_table_assigned[i] = false;
+    }
+
+    if (num < bits_precalc && bit_rev_table_assigned[num]) return bit_rev_table[num];
 
     unsigned int reverse = 0;
     int curr_digit = 1;
@@ -61,10 +78,13 @@ unsigned int MDFFT__bit_reverse (unsigned int num, unsigned int bits) {
         if (i < bits - 1) reverse <<= 1;
     }
 
+    bit_rev_table_assigned[num] = true;
+    bit_rev_table[num] = reverse;
+
     return reverse;
 }
 
-void MDFFT__bit_reverse_copy (float complex v_in[], float complex v_out[], int count) {
+void MDFFT__bit_reverse_copy (float complex v_in[], float complex v_out[], unsigned int count) {
 
     for (int i = 0; i < count; i++) v_out[i] = v_in[MDFFT__bit_reverse (i, MDFFT__lg_uint(count))];
 
@@ -95,18 +115,43 @@ void MDFFT__to_amp_surj (float complex v_in[], unsigned int count_in,
     }
 }
 
-void MDFFT__iterative (bool inverse, float complex v_in[], float complex v_out[], int count) {
+#define MDFFT__MAX_LG_COUNT 512
+
+void MDFFT__iterative (bool inverse, float complex v_in[], float complex v_out[], unsigned int count) {
+
+    static unsigned int lg_uint_precalc_count_assign = 2;
+    static unsigned int lg_uint_precalc_value = 1;
+
+    static unsigned int roots_of_unity_precalc_count = 1;
+    static float complex roots_of_unity_precalc_value [MDFFT__MAX_LG_COUNT];
 
     MDFFT__bit_reverse_copy (v_in, v_out, count);
 
     unsigned int m = 1;
 
-    for (unsigned int s = 1; s <= MDFFT__lg_uint (count); s++) {
+    if (count != lg_uint_precalc_count_assign) {
+
+        lg_uint_precalc_count_assign = count;
+
+        lg_uint_precalc_value = MDFFT__lg_uint (count);
+    }
+
+    for (unsigned int s = 1; s <= lg_uint_precalc_value; s++) {
 
         m <<= 1;    // substitute with look-up
 
-        float angle = (-2.0*M_PI)/m;
-        float complex w = cos(angle) + I * sin(angle);  // also substitute with lookup
+        float complex w = 0;
+
+        if (roots_of_unity_precalc_count < lg_uint_precalc_value + 1) {
+
+            float angle = (-2.0*M_PI)/m;
+            w = cos(angle) + I * sin(angle);
+
+            roots_of_unity_precalc_value[s-1] = w;
+
+            roots_of_unity_precalc_count = s;
+        }
+        else w = roots_of_unity_precalc_value[s-1];
 
         if (inverse) w = conj(w);
 
@@ -130,41 +175,6 @@ void MDFFT__apply_hanning (float complex v[], unsigned int count) {
     for (unsigned int i=0; i<count; i++)
 
         v[i] = (0.5 - 0.5*cos((2*M_PI*i)/count))*v[i];
-}
-
-void tests () {
-
-    float complex *v_in = malloc(8*sizeof(*v_in));
-    float complex v_out[8];
-
-    for (int i=0; i<8; i++) {
-        v_in[i] = cos(2*M_PI*i / 8);
-    }
-
-    MDFFT__apply_hanning(v_in, 8);
-
-    MDFFT__iterative(false, v_in, v_out, 8);
-
-    for(int i=0; i<8; i++) {
-        v_out[i] = v_out[i] / 8;
-        printf("[%d] = %.4f+%.4fi\n", i, creal(v_out[i]), cimag(v_out[i]));
-    }
-
-    float *res = malloc(2*sizeof(*res));
-
-    MDFFT__to_amp_surj(v_out, 8, res, 2);
-
-    printf("%02.2f, %02.2f\n", res[0], res[1]);
-
-    //
-    // float complex v_in2[8];
-    //
-    // MDFFT__iterative(true, v_out, v_in2, 8);
-    //
-    // for(int i=0; i<8; i++) {
-    //
-    //     printf("%.4f+%.4fi\n", creal(v_in2[i]), cimag(v_in2[i]));
-    // }
 }
 
 unsigned int MD__get_curr_seconds (MD__file_t *MD__file) {

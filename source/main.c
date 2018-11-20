@@ -29,10 +29,6 @@ void MD__playing_handle (void *data) {
 
 int main (int argc, char *argv[]) {
 
-    tests();
-
-    return 0;
-
     MDAL__initialize (4096, 4, 4);
 
     void *(* decoder)(void *) = NULL;
