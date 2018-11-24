@@ -634,11 +634,9 @@ void MDAL__buff_resize (MD__file_t *MD__file, unsigned int (*resize_f) (unsigned
     #endif
 
     alGenBuffers ((ALuint)MD__general.MD__buff_num, MD__file->MDAL__buffers);
-
     MDAL__pop_error ("Error creating buffers with new size.", 5);
-
-    return;
 }
+
 
 void MDAL__initialize (unsigned int buffer_size,
                        unsigned int buffer_num,

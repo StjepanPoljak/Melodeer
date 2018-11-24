@@ -39,7 +39,8 @@ bool MD__play_raw_with_decoder (MD__file_t *MD__file,
         return false;
     }
 
-    MD__play_raw (MD__file, decoder, metadata_handle, playing_handle, error_handle, buffer_underrun_handle, completion_handle);
+    MD__play_raw (MD__file, decoder, metadata_handle, playing_handle,
+                  error_handle, buffer_underrun_handle, completion_handle);
 
     return true;
 }
@@ -52,6 +53,8 @@ unsigned int MDFFT__lg_uint (unsigned int num) {
 
     return log_res;
 }
+
+#define MD__BIT_REVERSE_PRECALC_MAX 128
 
 unsigned int MDFFT__bit_reverse (unsigned int num, unsigned int bits) {
 
@@ -112,7 +115,14 @@ void MDFFT__to_amp_surj (float complex v_in[], unsigned int count_in,
 
         v_out[i] = 0;
 
-        for (int j=0; j<ratio; j++) v_out[i] += cabs (v_in[i*ratio+j]) / ratio;
+        for (int j=0; j<ratio; j++) {
+
+            // try this for maximum
+            //float curr = cabs (v_in[i*ratio+j]);
+            //if (curr > v_out[i]) v_out[i] = curr;
+
+            v_out[i] += cabs (v_in[i*ratio+j]) / ratio;
+        }
     }
 }
 

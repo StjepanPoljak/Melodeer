@@ -107,7 +107,7 @@ void    MDAL__initialize            (unsigned int buffer_size,
                                      unsigned int buffer_num,
                                      unsigned int pre_buffer);
 
-void    MDAL__buff_resize            (MD__file_t *MD__file, unsigned int (*resize_f) (unsigned int));
+void    MDAL__buff_resize           (MD__file_t *MD__file, unsigned int (*resize_f) (unsigned int));
 
 // call to close OpenAl
 
