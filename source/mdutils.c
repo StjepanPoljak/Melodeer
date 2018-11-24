@@ -4,6 +4,10 @@
 #include "mdwav.h"
 #include "mdmpg123.h"
 
+#define MDFFT__MAX_LG_COUNT 512
+
+#define MD__MAX_FFT_COUNT 65536
+
 // MD__play_raw wrappers
 
 bool MD__play_raw_with_decoder (MD__file_t *MD__file,
@@ -51,20 +55,44 @@ unsigned int MDFFT__lg_uint (unsigned int num) {
 
 unsigned int MDFFT__bit_reverse (unsigned int num, unsigned int bits) {
 
+    static unsigned int bit_rev_table[MD__MAX_FFT_COUNT] = { 0 };
+    static bool bit_rev_table_assigned[MD__MAX_FFT_COUNT] = { false };
+
+    static unsigned int bits_precalc = 0;
+
+    if (bit_rev_table_assigned[num] && (bits == bits_precalc) && (num < MD__MAX_FFT_COUNT))
+
+        return bit_rev_table[num];
+
+    if (bits_precalc != bits) {
+
+        bits_precalc = bits;
+
+        for (int i=0; i<MD__MAX_FFT_COUNT; i++) bit_rev_table_assigned[i] = false;
+    }
+
     unsigned int reverse = 0;
     int curr_digit = 1;
 
     for (int i=0; i<bits; i++) {
 
         if ((curr_digit & num) != 0) reverse += 1;
+
         curr_digit <<= 1;
+
         if (i < bits - 1) reverse <<= 1;
+    }
+
+    if (num < MD__MAX_FFT_COUNT) {
+
+        bit_rev_table_assigned[num] = true;
+        bit_rev_table[num] = reverse;
     }
 
     return reverse;
 }
 
-void MDFFT__bit_reverse_copy (float complex v_in[], float complex v_out[], int count) {
+void MDFFT__bit_reverse_copy (float complex v_in[], float complex v_out[], unsigned int count) {
 
     for (int i = 0; i < count; i++) v_out[i] = v_in[MDFFT__bit_reverse (i, MDFFT__lg_uint(count))];
 
@@ -88,44 +116,108 @@ void MDFFT__to_amp_surj (float complex v_in[], unsigned int count_in,
     }
 }
 
-void MDFFT__iterative (bool inverse, float complex v_in[], float complex v_out[], int count) {
+void MDFFT__iterative (bool inverse, float complex v_in[], float complex v_out[], unsigned int count) {
+
+    static unsigned int lg_uint_precalc_count_assign = 2;
+    static unsigned int lg_uint_precalc_value = 1;
+
+    static unsigned int roots_of_unity_precalc_count = 0;
+    static float complex roots_of_unity_precalc_value[MDFFT__MAX_LG_COUNT] = { 0 };
 
     MDFFT__bit_reverse_copy (v_in, v_out, count);
 
     unsigned int m = 1;
 
-    for (unsigned int s = 1; s <= MDFFT__lg_uint (count); s++) {
+    if (count != lg_uint_precalc_count_assign) {
 
-        m <<= 1;    // substitute with look-up
+        lg_uint_precalc_count_assign = count;
+        lg_uint_precalc_value = MDFFT__lg_uint (count);
+    }
 
-        float angle = (-2.0*M_PI)/m;
-        float complex w = cos(angle) + I * sin(angle);  // also substitute with lookup
+    for (unsigned int s = 1; s <= lg_uint_precalc_value; s++) {
+
+        m <<= 1;
+
+        float complex w = 0;
+
+        if (lg_uint_precalc_value <= MDFFT__MAX_LG_COUNT) {
+
+            if (roots_of_unity_precalc_count != lg_uint_precalc_value) {
+
+                float angle = (-2.0 * M_PI) / m;
+                w = cos (angle) + I * sin (angle);
+
+                roots_of_unity_precalc_value[s-1] = w;
+            }
+            else w = roots_of_unity_precalc_value[s-1];
+        }
+        else {
+
+            float angle = (-2.0 * M_PI) / m;
+            w = cos (angle) + I * sin (angle);
+        }
 
         if (inverse) w = conj(w);
 
         for (unsigned int k=0; k<count; k+=m) {
 
             float complex v=1;
+
             for (unsigned int j=0; j<m/2; j++) {
 
                 float complex t = v * v_out[k+j+m/2];
                 float complex u = v_out[k+j];
+
                 v_out[k+j] = u + t;
                 v_out[k+j+m/2] = u - t;
                 v = v * w;
             }
         }
     }
+
+    roots_of_unity_precalc_count = lg_uint_precalc_value;
+
 }
 
 void MDFFT__apply_hanning (float complex v[], unsigned int count) {
 
-    for (unsigned int i=0; i<count; i++)
+    static float complex hanning_precalc[MD__MAX_FFT_COUNT] = { 0 };
+    static unsigned int hanning_precalc_count = 0;
 
-        v[i] = (0.5 - 0.5*cos((2*M_PI*i)/count))*v[i];
+    if (count == hanning_precalc_count && count <= MD__MAX_FFT_COUNT) {
+
+        for (unsigned int i=0; i<count; i++) {
+
+            v[i] = hanning_precalc[i] * v[i];
+        }
+    }
+    else {
+
+        for (unsigned int i=0; i<count; i++) {
+
+            float complex hanning_i = 0.5 - 0.5 * cos ((2*M_PI*i) / count);
+
+            v[i] = hanning_i * v[i];
+
+            if (i < MD__MAX_FFT_COUNT) hanning_precalc[i] = hanning_i;
+        }
+
+        hanning_precalc_count = count;
+    }
 }
 
 void tests () {
+
+    for (int i=0; i<5; i++) {
+
+        for (int j=0; j<16; j++) {
+
+            printf("%d, ", MDFFT__bit_reverse (j, 4));
+        }
+        printf("\n");
+    }
+
+    return;
 
     float complex *v_in = malloc(8*sizeof(*v_in));
     float complex v_out[8];

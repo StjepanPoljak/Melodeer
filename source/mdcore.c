@@ -599,15 +599,45 @@ void MDAL__buff_init (MD__file_t *MD__file) {
         MD__log ("Generating sources.");
     #endif
 
-    alGenSources((ALuint)1, &MD__file->MDAL__source);
-    MDAL__pop_error("Error generating source.", 4);
+    alGenSources ((ALuint)1, &MD__file->MDAL__source);
+    MDAL__pop_error ("Error generating source.", 4);
 
     #ifdef MDCORE_DEBUG
         MD__log ("Generating buffers.");
     #endif
 
-    alGenBuffers((ALuint)MD__general.MD__buff_num, MD__file->MDAL__buffers);
-    MDAL__pop_error("Error creating buffer.", 5);
+    alGenBuffers ((ALuint)MD__general.MD__buff_num, MD__file->MDAL__buffers);
+    MDAL__pop_error ("Error creating buffer.", 5);
+}
+
+
+void MDAL__buff_resize (MD__file_t *MD__file, unsigned int (*resize_f) (unsigned int)) {
+
+    #ifdef MDCORE_DEBUG
+        MD__log ("Deleting old buffers.");
+    #endif
+
+    alDeleteBuffers ((ALuint) MD__general.MD__buff_num, MD__file->MDAL__buffers);
+
+    #ifdef MDCORE_DEBUG
+        MD__log ("Reallocating buffers.");
+    #endif
+
+    if (resize_f) MD__general.MD__buff_num = resize_f (MD__general.MD__buff_num);
+
+    else MD__general.MD__buff_num++;
+
+    MD__file->MDAL__buffers = realloc (MD__file->MDAL__buffers, sizeof (ALuint) * MD__general.MD__buff_num);
+
+    #ifdef MDCORE_DEBUG
+        MD__log ("Generating new buffers.");
+    #endif
+
+    alGenBuffers ((ALuint)MD__general.MD__buff_num, MD__file->MDAL__buffers);
+
+    MDAL__pop_error ("Error creating buffers with new size.", 5);
+
+    return;
 }
 
 void MDAL__initialize (unsigned int buffer_size,
