@@ -188,9 +188,12 @@ void MD__play_raw (MD__file_t *MD__file,
                           MD__file->MD__last_chunk->order);
         #endif
 
+        unsigned int mod4 = MD__file->MD__current_chunk->size % 4;
+
+        if (mod4 != 0) MD__file->MD__current_chunk->size -= mod4;
 
         alBufferData (MD__file->MDAL__buffers[i], MD__file->MD__metadata.format, MD__file->MD__current_chunk->chunk,
-                     MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
+                      MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
 
         #ifdef MDCORE_DEBUG
             MDLOG__dynamic ("Loaded chunk no. %lu with size %lu (out of %lu loaded chunks).",
@@ -351,8 +354,12 @@ void MD__play_raw (MD__file_t *MD__file,
                                 MD__file->MD__last_chunk->order);
             #endif
 
+            unsigned int mod4 = MD__file->MD__current_chunk->size % 4;
+
+            if (mod4 != 0) MD__file->MD__current_chunk->size -= mod4;
+
             alBufferData (buffer, MD__file->MD__metadata.format, MD__file->MD__current_chunk->chunk,
-                         MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
+                          MD__file->MD__current_chunk->size, (ALuint) MD__file->MD__metadata.sample_rate);
 
             #ifdef MDCORE_DEBUG
                 MDLOG__dynamic ("Loaded chunk no. %lu with size %lu (out of %lu loaded chunks).",
