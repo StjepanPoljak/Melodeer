@@ -620,6 +620,8 @@ void MDAL__buff_init (MD__file_t *MD__file) {
 
 void MDAL__buff_resize (MD__file_t *MD__file, unsigned int (*resize_f) (unsigned int)) {
 
+    // this does not really work - will have to try OpenAL close and init and see if it pays off at all
+
     #ifdef MDCORE_DEBUG
         MD__log ("Deleting old buffers.");
     #endif
