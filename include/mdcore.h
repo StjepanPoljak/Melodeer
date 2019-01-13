@@ -132,8 +132,10 @@ void    MD__play_raw                (MD__file_t *MD__file,                      
 /* called if there are delays     */ void (*buffer_underrun_handle) (void *),
 /* called when done playing       */ void (*completion_handle) (void *));
 
+void    MD__stop_raw                (MD__file_t *MD__file);
 void    MD__stop                    (MD__file_t *MD__file);
 bool    MD__did_stop                (MD__file_t *MD__file);
+void    MD__toggle_pause_raw        (MD__file_t *MD__file);
 void    MD__toggle_pause            (MD__file_t *MD__file);
 bool    MD__is_paused               (MD__file_t *MD__file);
 

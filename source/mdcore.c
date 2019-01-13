@@ -465,6 +465,14 @@ void MD__play_raw (MD__file_t *MD__file,
 
 }
 
+void MD__stop_raw (MD__file_t *MD__file) {
+    MD__file->MD__stop_playing = true;
+
+    #ifdef MDCORE_DEBUG
+        MD__log ("Sending stop signal...");
+    #endif
+}
+
 void MD__stop (MD__file_t *MD__file) {
 
     MD__lock (MD__file);
@@ -521,13 +529,13 @@ bool MD__wait_if_paused (MD__file_t *MD__file) {
     return was_paused_or_stopped;
 }
 
-void MD__toggle_pause (MD__file_t *MD__file) {
+void MD__toggle_pause_raw (MD__file_t *MD__file) {
 
     #ifdef MDCORE_DEBUG
         MD__log ("Received pause signal.");
     #endif
 
-    MD__lock (MD__file);
+    // MD__lock (MD__file);
 
     if (MD__file->MD__stop_playing) {
 
@@ -535,51 +543,60 @@ void MD__toggle_pause (MD__file_t *MD__file) {
             MD__log ("Ignoring pause signal received during stop process.");
         #endif
 
-        MD__unlock (MD__file);
+        // MD__unlock (MD__file);
 
-        return;
-    }
-
-    MD__file->MD__pause_playing = !MD__file->MD__pause_playing;
-
-    ALint val;
-
-    if (MD__file->MD__pause_playing) {
-
-        alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
-
-        if (val == AL_PLAYING) {
-
-
-            #ifdef MDCORE__DEBUG
-                MD__log ("Stop playing due to pause signal.");
-            #endif
-
-            alSourceStop (MD__file->MDAL__source);
-        }
-        else {
-
-            #ifdef MDCORE__DEBUG
-                MD__log ("Playing already stopped.");
-            #endif
-        }
+        // return;
     }
     else {
 
-        alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
+        MD__file->MD__pause_playing = !MD__file->MD__pause_playing;
 
-        if (val != AL_PLAYING) {
+        ALint val;
 
-            alSourcePlay (MD__file->MDAL__source);
+        if (MD__file->MD__pause_playing) {
+
+            alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
+
+            if (val == AL_PLAYING) {
+
+
+                #ifdef MDCORE__DEBUG
+                    MD__log ("Stop playing due to pause signal.");
+                #endif
+
+                alSourceStop (MD__file->MDAL__source);
+            }
+            else {
+
+                #ifdef MDCORE__DEBUG
+                    MD__log ("Playing already stopped.");
+                #endif
+            }
         }
         else {
 
-            #ifdef MDCORE__DEBUG
-                MD__log ("Unpause while already playing (possible bug).");
-            #endif
+            alGetSourcei (MD__file->MDAL__source, AL_SOURCE_STATE, &val);
+
+            if (val != AL_PLAYING) {
+
+                alSourcePlay (MD__file->MDAL__source);
+            }
+            else {
+
+                #ifdef MDCORE__DEBUG
+                    MD__log ("Unpause while already playing (possible bug).");
+                #endif
+            }
         }
     }
 
+    // MD__unlock (MD__file);
+}
+
+void MD__toggle_pause (MD__file_t *MD__file) {
+
+    MD__lock (MD__file);
+    MD__toggle_pause_raw (MD__file);
     MD__unlock (MD__file);
 }
 
