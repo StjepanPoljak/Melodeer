@@ -19,7 +19,6 @@ HOME_PATH=$1
 
 (cd $HOME_PATH; git clone https://www.github.com/StjepanPoljak/Melodeer; git clone https://www.github.com/StjepanPoljak/MelodeerGUI)
 
-
 if [ -z "$2" ]
 then
 	docker run -ti \
