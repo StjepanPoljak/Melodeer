@@ -1,5 +1,11 @@
 #include "mdcore.h"
 
+#define USLEEP_TIME 500
+
+#ifdef USLEEP_TIME
+#include <unistd.h>
+#endif
+
 #ifdef MDCORE_DEBUG
     #include "mdlog.h"
 #endif
@@ -111,6 +117,10 @@ void MD__play_raw (MD__file_t *MD__file,
 
     while (true) {
 
+        #ifdef USLEEP_TIME
+            usleep(USLEEP_TIME);
+        #endif
+
         MD__lock (MD__file);
         if (MD__file->MD__metadata_loaded) {
             MD__unlock (MD__file);
@@ -128,6 +138,10 @@ void MD__play_raw (MD__file_t *MD__file,
     #endif
 
     while (true) {
+
+        #ifdef USLEEP_TIME
+            usleep(USLEEP_TIME);
+        #endif
 
         MD__lock (MD__file);
         if (MD__file->MD__last_chunk != NULL) {
@@ -247,6 +261,10 @@ void MD__play_raw (MD__file_t *MD__file,
     #endif
 
     while (true) {
+
+        #ifdef USLEEP_TIME
+            usleep(USLEEP_TIME);
+        #endif
 
         MD__wait_if_paused (MD__file);
 
@@ -394,6 +412,10 @@ void MD__play_raw (MD__file_t *MD__file,
 
             while (true) {
 
+                #ifdef USLEEP_TIME
+                    usleep(USLEEP_TIME);
+                #endif
+
                 MD__lock (MD__file);
                 if (MD__file->MD__current_chunk->next) break;
                 MD__unlock (MD__file);
@@ -415,6 +437,10 @@ void MD__play_raw (MD__file_t *MD__file,
     #endif
 
     while (val == AL_PLAYING) {
+
+        #ifdef USLEEP_TIME
+            usleep(USLEEP_TIME);
+        #endif
 
         bool was_paused = MD__wait_if_paused (MD__file);
 
@@ -505,6 +531,10 @@ bool MD__wait_if_paused (MD__file_t *MD__file) {
 
 
     while (true) {
+
+        #ifdef USLEEP_TIME
+            usleep(USLEEP_TIME);
+        #endif
 
         MD__lock (MD__file);
 
