@@ -1,3 +1,6 @@
+ifeq ($(origin CC),default)
+CC = gcc
+endif
 proj = melodeer
 objects = main.o mdflac.o mdwav.o mdmpg123.o mdlog.o mdutils.o
 libs = openal FLAC pthread mpg123 m
@@ -10,18 +13,18 @@ builddir = build
 depsdir = include
 
 $(proj): $(objects) mdcore.o
-	gcc $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o $(proj)
+	$(CC) $(addprefix $(builddir)/,$^) $(addprefix -l,$(libs)) -o $(proj)
 	@-./save.sh
 
 %.o : $(srcdir)/%.c $(depsdir)/%.h
-	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(OFLAGS)
+	$(CC) -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(OFLAGS)
 
 mdcore.o : $(srcdir)/mdcore.c $(depsdir)/mdcore.h
-	gcc -c $(srcdir)/mdcore.c -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(MDCOREFLAGS)
+	$(CC) -c $(srcdir)/mdcore.c -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(MDCOREFLAGS)
 
 main.o: $(srcdir)/main.c
 	@-mkdir $(builddir)
-	gcc -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(MAINFLAGS)
+	$(CC) -c $< -o $(addprefix $(builddir)/,$@) -I$(depsdir) -O3 $(MAINFLAGS)
 
 .PHONY=debug
 debug: MDCOREFLAGS=-D MDCORE_DEBUG
