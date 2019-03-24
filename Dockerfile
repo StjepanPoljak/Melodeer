@@ -1,4 +1,4 @@
-FROM debian
+FROM ubuntu
 
 RUN apt-get -y update && apt-get -y install git make sudo gcc libopenal-dev \
 	libmpg123-dev libflac-dev gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 wine64

@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if ! [ -f "$HOME/.gitconfig" ]
+then
+	echo "(!) Please configure git."
+	exit 3
+fi
+
 IMAGE_TAG=stjepan1986/melodeer
 REPO_CHECK=$(docker images -q $IMAGE_TAG)
 
@@ -56,23 +62,13 @@ then
 	MDGUI_DIR="$PARENT_DIR/MelodeerGUI"
 fi
 
-if [ -z "$MEDIA_DIR" ]
-then
-
-	docker run -ti \
-		--network host \
-		-v /dev/snd:/dev/snd \
-		-v "$CURR_DIR":/home/dev/Melodeer \
-		-v "$MDGUI_DIR":/home/dev/MelodeerGUI \
-		--privileged \
-		$IMAGE_TAG
-else
-	docker run -ti \
-		--network host \
-		-v /dev/snd:/dev/snd \
-		-v "$CURR_DIR":/home/dev/Melodeer \
-		-v "$MEDIA_DIR":/home/dev/Media \
-		-v "$MDGUI_DIR":/home/dev/MelodeerGUI \
-		--privileged \
-		$IMAGE_TAG
-fi
+docker run -ti --network host --device /dev/snd \
+	-e PULSE_SERVER=unix:"${XDG_RUNTIME_DIR}"/pulse/native \
+	-v "${XDG_RUNTIME_DIR}"/pulse/native:"${XDG_RUNTIME_DIR}"/pulse/native \
+	-v "$HOME"/.config/pulse/cookie:/root/.config/pulse/cookie \
+	--group-add $(getent group audio | cut -d: -f3) \
+	-v "$CURR_DIR":/home/dev/Melodeer \
+	-v "$MEDIA_DIR":/home/dev/Media \
+	-v "$HOME"/.gitconfig:/home/dev/.gitconfig \
+	-v "$MDGUI_DIR":/home/dev/MelodeerGUI \
+	$IMAGE_TAG
