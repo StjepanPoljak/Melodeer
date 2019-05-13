@@ -69,6 +69,8 @@ struct MD__file {
 
 #if defined (linux) || defined (__APPLE__)
     pthread_mutex_t         MD__mutex;
+    pthread_cond_t          MD__cond;
+    pthread_barrier_t       MD__barrier;
 #endif
 
 #ifdef _WIN32
@@ -85,6 +87,7 @@ struct MD__file {
     volatile bool           MD__pause_playing;
 
     unsigned int            MD__seek_sec;
+    float                   MD__time_slice;
 
     ALuint                  *MDAL__buffers;
     ALuint                  MDAL__source;

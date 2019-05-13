@@ -1,9 +1,8 @@
 #include "mdcore.h"
 
-#define USLEEP_TIME 500
-
-#ifdef USLEEP_TIME
+#if defined (linux) || defined (__APPLE__)
 #include <unistd.h>
+#include <time.h>
 #endif
 
 #ifdef MDCORE_DEBUG
@@ -20,7 +19,9 @@ ALenum      MDAL__get_format            (unsigned int channels, unsigned int bps
 void        MDAL__clear                 (MD__file_t *MD__file);
 
 void        MD__remove_buffer_head      (MD__file_t *MD__file);
-bool        MD__wait_if_paused          (MD__file_t *MD__file);
+void        MD__wait                    (MD__file_t *MD__file);
+void        MD__signal                  (MD__file_t *MD__file);
+void        MD__barrier_wait            (MD__file_t *MD__file);
 
 void        (*MD__metadata_fptr)        (MD__metadata_t, void *) = NULL;
 
@@ -66,6 +67,10 @@ void MD__play_raw (MD__file_t *MD__file,
 #if defined (linux) || defined (__APPLE__)
 
     pthread_mutex_init (&MD__file->MD__mutex, NULL);
+
+    pthread_cond_init (&MD__file->MD__cond, NULL);
+
+    pthread_barrier_init (&MD__file->MD__barrier, NULL, 2);
 
     pthread_t decoder_thread;
 
@@ -115,19 +120,7 @@ void MD__play_raw (MD__file_t *MD__file,
         MD__log ("Waiting for metadata to load.");
     #endif
 
-    while (true) {
-
-        #ifdef USLEEP_TIME
-            usleep(USLEEP_TIME);
-        #endif
-
-        MD__lock (MD__file);
-        if (MD__file->MD__metadata_loaded) {
-            MD__unlock (MD__file);
-            break;
-        }
-        MD__unlock (MD__file);
-    }
+    MD__barrier_wait (MD__file);
 
     #ifdef MDCORE_DEBUG
         MD__log ("Metadata loaded.");
@@ -138,10 +131,6 @@ void MD__play_raw (MD__file_t *MD__file,
     #endif
 
     while (true) {
-
-        #ifdef USLEEP_TIME
-            usleep(USLEEP_TIME);
-        #endif
 
         MD__lock (MD__file);
         if (MD__file->MD__last_chunk != NULL) {
@@ -262,11 +251,7 @@ void MD__play_raw (MD__file_t *MD__file,
 
     while (true) {
 
-        #ifdef USLEEP_TIME
-            usleep(USLEEP_TIME);
-        #endif
-
-        MD__wait_if_paused (MD__file);
+        MD__wait (MD__file);
 
         MD__lock (MD__file);
 
@@ -336,8 +321,6 @@ void MD__play_raw (MD__file_t *MD__file,
         }
 
         for(int i=0; i<val; i++) {
-
-            if (MD__wait_if_paused (MD__file)) break;
 
             #ifdef MDCORE_DEBUG
                 MDLOG__dynamic ("Unqueuing buffer.");
@@ -438,11 +421,7 @@ void MD__play_raw (MD__file_t *MD__file,
 
     while (val == AL_PLAYING) {
 
-        #ifdef USLEEP_TIME
-            usleep(USLEEP_TIME);
-        #endif
-
-        bool was_paused = MD__wait_if_paused (MD__file);
+        MD__wait (MD__file);
 
         MD__lock (MD__file);
         if (MD__file->MD__stop_playing) {
@@ -493,6 +472,7 @@ void MD__play_raw (MD__file_t *MD__file,
 
 void MD__stop_raw (MD__file_t *MD__file) {
     MD__file->MD__stop_playing = true;
+    MD__signal (MD__file);
 
     #ifdef MDCORE_DEBUG
         MD__log ("Sending stop signal...");
@@ -503,6 +483,7 @@ void MD__stop (MD__file_t *MD__file) {
 
     MD__lock (MD__file);
     MD__file->MD__stop_playing = true;
+    MD__signal (MD__file);
     MD__unlock (MD__file);
 
     #ifdef MDCORE_DEBUG
@@ -521,42 +502,24 @@ bool MD__did_stop (MD__file_t *MD__file) {
     return return_val;
 }
 
-bool MD__wait_if_paused (MD__file_t *MD__file) {
+void MD__wait (MD__file_t *MD__file) {
 
     MD__lock (MD__file);
 
-        bool was_paused_or_stopped = MD__file->MD__stop_playing || MD__file->MD__pause_playing;
+    struct timespec ts;
+
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_nsec += (unsigned long)(MD__file->MD__time_slice / (float)MD__general.MD__buff_num) * 1000000000;
+    pthread_cond_timedwait (&MD__file->MD__cond, &MD__file->MD__mutex, &ts);
+
+    if (MD__file->MD__pause_playing) pthread_cond_wait (&MD__file->MD__cond, &MD__file->MD__mutex);
 
     MD__unlock (MD__file);
+}
 
+void MD__signal (MD__file_t *MD__file) {
 
-    while (true) {
-
-        #ifdef USLEEP_TIME
-            usleep(USLEEP_TIME);
-        #endif
-
-        MD__lock (MD__file);
-
-        if (MD__file->MD__stop_playing) {
-
-            MD__file->MD__pause_playing = false;
-
-            MD__unlock (MD__file);
-
-            break;
-        }
-
-        if (!MD__file->MD__pause_playing) {
-
-            MD__unlock (MD__file);
-
-            break;
-        }
-        MD__unlock (MD__file);
-    }
-
-    return was_paused_or_stopped;
+    pthread_cond_signal (&MD__file->MD__cond);
 }
 
 void MD__toggle_pause_raw (MD__file_t *MD__file) {
@@ -565,17 +528,12 @@ void MD__toggle_pause_raw (MD__file_t *MD__file) {
         MD__log ("Received pause signal.");
     #endif
 
-    // MD__lock (MD__file);
-
     if (MD__file->MD__stop_playing) {
 
         #ifdef MDCORE__DEBUG
             MD__log ("Ignoring pause signal received during stop process.");
         #endif
 
-        // MD__unlock (MD__file);
-
-        // return;
     }
     else {
 
@@ -620,7 +578,7 @@ void MD__toggle_pause_raw (MD__file_t *MD__file) {
         }
     }
 
-    // MD__unlock (MD__file);
+    MD__signal (MD__file);
 }
 
 void MD__toggle_pause (MD__file_t *MD__file) {
@@ -1120,7 +1078,11 @@ bool MD__set_metadata (MD__file_t *MD__file,
         MD__log ("Metadata set and dispatched.");
     #endif
 
+    MD__file->MD__time_slice = ((float)MD__general.MD__buff_size / ((float)MD__file->MD__metadata.bps * (float)MD__file->MD__metadata.channels / (float)8)) / (float)MD__file->MD__metadata.sample_rate;
+
     MD__unlock (MD__file);
+
+    MD__barrier_wait (MD__file);
 
     return true;
 }
@@ -1157,6 +1119,17 @@ void MD__unlock (MD__file_t *MD__file) {
     #ifdef _WIN32
     ReleaseMutex (MD__file->MD__mutex);
     #endif
+}
+
+void MD__barrier_wait (MD__file_t *MD__file) {
+
+    //#if defined(linux) || defined(__APPLE__)
+    pthread_barrier_wait (&MD__file->MD__barrier);
+    //#endif
+
+    //#ifdef _WIN32
+    // TODO
+    //#endif
 }
 
 void MD__get_logo (char logo[76]) {
