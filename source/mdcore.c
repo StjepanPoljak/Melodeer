@@ -509,7 +509,7 @@ void MD__wait (MD__file_t *MD__file) {
     struct timespec ts;
 
     clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_nsec += (unsigned long)(MD__file->MD__time_slice / (float)MD__general.MD__buff_num) * 1000000000;
+    ts.tv_nsec = ts.tv_nsec + MD__file->MD__time_slice;
     pthread_cond_timedwait (&MD__file->MD__cond, &MD__file->MD__mutex, &ts);
 
     if (MD__file->MD__pause_playing) pthread_cond_wait (&MD__file->MD__cond, &MD__file->MD__mutex);
@@ -1078,7 +1078,9 @@ bool MD__set_metadata (MD__file_t *MD__file,
         MD__log ("Metadata set and dispatched.");
     #endif
 
-    MD__file->MD__time_slice = ((float)MD__general.MD__buff_size / ((float)MD__file->MD__metadata.bps * (float)MD__file->MD__metadata.channels / (float)8)) / (float)MD__file->MD__metadata.sample_rate;
+    float time_slice = (((float)MD__general.MD__buff_size / ((float)MD__file->MD__metadata.bps * (float)MD__file->MD__metadata.channels / (float)8)) / (float)MD__file->MD__metadata.sample_rate);
+
+    MD__file->MD__time_slice = (unsigned long)(MD__general.MD__buff_num - 1) * (unsigned long)((1000000000 * time_slice) / (float)MD__general.MD__buff_num);
 
     MD__unlock (MD__file);
 

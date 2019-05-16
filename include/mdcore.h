@@ -87,7 +87,7 @@ struct MD__file {
     volatile bool           MD__pause_playing;
 
     unsigned int            MD__seek_sec;
-    float                   MD__time_slice;
+    unsigned int            MD__time_slice;
 
     ALuint                  *MDAL__buffers;
     ALuint                  MDAL__source;
