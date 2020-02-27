@@ -18,3 +18,15 @@ In order to build Melodeer, following libraries are needed (customizable by tink
 * mdmpg123
 
   - mpg123 library (https://sourceforge.net/projects/mpg123/files/)
+
+On Ubuntu, to install these dependencies, just do:
+
+```shell
+sudo apt install libopenal-dev libmpg123-dev libflac-dev
+```
+
+Then, to build executable, run `make`. To build and install a shared library (as required by [MelodeerGUI](https://github.com/StjepanPoljak/MelodeerGUI)), run:
+
+```shell
+sudo make shared
+```
