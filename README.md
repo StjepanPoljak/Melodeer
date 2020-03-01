@@ -8,19 +8,13 @@ Melodeer should enable programmers to choose only formats in which they are inte
 
 ## Build
 
-In order to build Melodeer, following libraries are needed (customizable by tinkering Makefile):
+In order to build Melodeer, following libraries are needed (customizable by tinkering CMake):
 
-* mdcore
+* OpenAL library (https://github.com/kcat/openal-soft)
 
-  - OpenAL library (https://github.com/kcat/openal-soft)
+* FLAC library (https://github.com/xiph/flac)
 
-* mdflac
-
-  - FLAC library (https://github.com/xiph/flac)
-
-* mdmpg123
-
-  - mpg123 library (https://sourceforge.net/projects/mpg123/files/)
+* mpg123 library (https://sourceforge.net/projects/mpg123/files/)
 
 On Ubuntu, to install these dependencies, just do:
 
@@ -28,8 +22,9 @@ On Ubuntu, to install these dependencies, just do:
 sudo apt install libopenal-dev libmpg123-dev libflac-dev
 ```
 
-Then, to build executable, run `make`. To build and install a shared library (as required by [MelodeerGUI](https://github.com/StjepanPoljak/MelodeerGUI)), run:
+Then, to build and install both the executable and the shared library, do:
 
 ```shell
-sudo make shared
+cmake .
+make
 ```
