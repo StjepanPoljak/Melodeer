@@ -1,6 +1,6 @@
-[![Build Status](https://travis-ci.org/StjepanPoljak/Melodeer.svg?branch=master)](https://travis-ci.org/StjepanPoljak/Melodeer)
-
 # Melodeer
+
+[![Build Status](https://travis-ci.org/StjepanPoljak/Melodeer.svg?branch=master)](https://travis-ci.org/StjepanPoljak/Melodeer)
 
 A humble audio player based on OpenAL.
 
