@@ -1,4 +1,7 @@
 language: c
 compiler: gcc
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install -y libopenal-dev libmpg123-dev libflac-dev
 script:
   - cmake . && make
