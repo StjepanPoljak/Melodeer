@@ -29,4 +29,5 @@ Then, to build and install both the executable and the shared library, do:
 ```shell
 cmake .
 make
+sudo make install
 ```
