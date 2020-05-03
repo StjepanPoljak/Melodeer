@@ -9,7 +9,7 @@
 
 void MD__handle_metadata (MD__metadata_t metadata, void *);
 
-void transform (volatile MD__buffer_chunk_t *curr_chunk,
+void transform (MD__buffer_chunk_t *curr_chunk,
                 unsigned int sample_rate,
                 unsigned int channels,
                 unsigned int bps,
@@ -105,7 +105,7 @@ void MD__handle_metadata (MD__metadata_t metadata, void *data) {
     printf("\n");
 }
 
-void transform (volatile MD__buffer_chunk_t *curr_chunk,
+void transform (MD__buffer_chunk_t *curr_chunk,
                 unsigned int sample_rate,
                 unsigned int channels,
                 unsigned int bps,

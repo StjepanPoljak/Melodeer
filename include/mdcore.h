@@ -63,9 +63,9 @@ struct MD__file {
     char        *filename;
     FILE        *file;
 
-    volatile    MD__buffer_chunk_t     *MD__first_chunk;
-    volatile    MD__buffer_chunk_t     *MD__current_chunk;
-    volatile    MD__buffer_chunk_t     *MD__last_chunk;
+    MD__buffer_chunk_t     *MD__first_chunk;
+    MD__buffer_chunk_t     *MD__current_chunk;
+    MD__buffer_chunk_t     *MD__last_chunk;
 
 #if defined (linux) || defined (__APPLE__)
     pthread_mutex_t         MD__mutex;
@@ -94,7 +94,7 @@ struct MD__file {
 
     void                    *user_data;
 
-    void (*MD__buffer_transform)    (volatile MD__buffer_chunk_t *curr_chunk,
+    void (*MD__buffer_transform)    (MD__buffer_chunk_t *curr_chunk,
                                     unsigned int sample_rate,
                                     unsigned int channels,
                                     unsigned int bps,
