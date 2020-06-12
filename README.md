@@ -30,4 +30,5 @@ Then, to build and install both the executable and the shared library, do:
 cmake .
 make
 sudo make install
+sudo ldconfig
 ```
