@@ -1,24 +1,53 @@
-#ifndef MDLOG_H
+#ifndef MD_LOG_H
+#define MD_LOG_H
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <stdarg.h>
-#include <stdbool.h>
 
-#include <sys/stat.h>
-#include <sys/types.h>
+#ifdef CONFIG_DEBUG
 
-#define  SEC_PER_DAY     86400
-#define  SEC_PER_HOUR    3600
-#define  SEC_PER_MIN     60
+#include <string.h>
 
-void    MD__log                 (const char *string, ...);
-void    MDLOG__dynamic          (const char *string, ...);
-void    MDLOG__dynamic_reset    ();
-void    MDLOG__reset_log        ();
-void    MDLOG__remove_last_line ();
+#define __FILENAME__ ({ \
+	char* fname = strrchr(__FILE__, '/'); \
+	fname ? fname + 1 : __FILE__; \
+})	
+
+#define md_log_raw(symbol, fmt, ...) \
+do { \
+	printf("(%c) [%s:%d]: %s\n", symbol, \
+	       __FILENAME__, __LINE__, \
+	       fmt, ## __VA_ARGS__); \
+} while (0)
+
+#define md_trace(fmt, ...)
+
+#else
+
+#define md_log_raw(symbol, fmt, ...) \
+do { \
+	printf("(%c) %s\n", symbol, fmt, ## __VA_ARGS__); \
+} while (0)
+
+#define md_trace(fmt, ...) \
+do { \
+	printf("\t-> %s\n", fmt, ## __VA_ARGS__); \
+} while (0)
 
 #endif
 
-#define MDLOG_H
+#define md_log(fmt, ...) \
+do { \
+	 md_log_raw('i', fmt, ## __VA_ARGS__); \
+} while (0)
+
+#define md_warning(fmt, ...) \
+do { \
+	md_log_raw('*', fmt, ## __VA_ARGS__); \
+while (0)
+
+#define md_error(fmt, ...) \
+do { \
+	md_log_raw('!', fmt, ## __VA_ARGS__); \
+} while (0)
+
+#endif

@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.8)
 project (Melodeer C)
 
 set (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -13,12 +13,17 @@ set (Melodeer_VERSION_MINOR 0)
 
 set (SRC_FILES
 	source/main.c
+	source/mdopenal.c
+	source/mdbufll.c
+	source/mdbufchunk.c
+	source/mddriver.c
 	source/mdcore.c
 	source/mdflac.c
-	source/mdlog.c
-	source/mdmpg123.c
-	source/mdutils.c
-	source/mdwav.c)
+	source/mdsettings.c
+	#source/mdmpg123.c
+	#source/mdutils.c
+	#source/mdwav.c
+	)
 
 include_directories (
 	"${PROJECT_SOURCE_DIR}/include"
@@ -26,6 +31,7 @@ include_directories (
 
 add_executable (melodeer-exec source/main.c ${SRC_FILES})
 add_library (melodeer SHARED ${SRC_FILES})
+add_definitions(-DCONFIG_DEBUG)
 
 set (MD_LIBS
 	${CMAKE_THREAD_LIBS_INIT}

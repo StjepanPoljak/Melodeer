@@ -1,122 +1,135 @@
-#include "mdflac.h"
+#include "mddecoder.h"
+
+#include <stdbool.h>
+#include <stdlib.h>
+#include <errno.h>
+
+#include "FLAC/stream_decoder.h"
 #include "mdcore.h"
+#include "mdlog.h"
+#include "mdbufchunk.h"
 
-FLAC__StreamDecoder *MDFLAC__decoder = 0;
+static FLAC__StreamDecoder* md_flac_decoder;
 
-void *MDFLAC__start_decoding (void *MD__file) {
+void md_flac_metadata_cb(const FLAC__StreamDecoder* decoder,
+			 const FLAC__StreamMetadata* metadata,
+			 void* client_data) {
+	md_metadata_t* meta;
 
-    FLAC__bool                      ok = true;
+	meta = malloc(sizeof(*meta));
+	if (!meta) {
+		md_error("Could not allocate memory.");
+		goto early_fail_metadata;
+	}
 
-    FLAC__StreamDecoderInitStatus   init_status;
+	meta->sample_rate = metadata->data.stream_info.sample_rate;
+	meta->channels = metadata->data.stream_info.channels;
+	meta->bps = metadata->data.stream_info.bits_per_sample;
+	meta->total_samples = metadata->data.stream_info.total_samples;
 
-    if ((MDFLAC__decoder = FLAC__stream_decoder_new ()) == NULL)
+	if (metadata->type != FLAC__METADATA_TYPE_STREAMINFO) {
+		md_error("Metadata not valid.");
+		goto fail_metadata;
+	}
 
-        MD__decoding_error_signal ((MD__file_t *)MD__file);
+	if (md_set_metadata(meta)) {
+		md_error("Could not set metadata.");
+		goto fail_metadata;
+	}
 
-    init_status = FLAC__stream_decoder_init_FILE (MDFLAC__decoder,
-                                                 ((MD__file_t *) MD__file)->file,
-                                                  MDFLAC__write_callback,
-                                                  MDFLAC__metadata_callback,
-                                                  MDFLAC__error_callback,
-                                                  MD__file);
+	return;
 
-    if (init_status != FLAC__STREAM_DECODER_INIT_STATUS_OK) ok = false;
+fail_metadata:
+	free(meta);
 
-    if (ok) ok = FLAC__stream_decoder_process_until_end_of_stream (MDFLAC__decoder);
+early_fail_metadata:
+	FLAC__stream_decoder_finish(md_flac_decoder);
+	FLAC__stream_decoder_delete(md_flac_decoder);
 
-    FLAC__stream_decoder_finish (MDFLAC__decoder);
-    FLAC__stream_decoder_delete (MDFLAC__decoder);
+	return;
+}
 
-    MD__decoding_done_signal ((MD__file_t *)MD__file);
+static void md_flac_error_cb(const FLAC__StreamDecoder* decoder,
+			     FLAC__StreamDecoderErrorStatus status,
+			     void* client_data) {
 
-    if (!ok) MD__decoding_error_signal ((MD__file_t *) MD__file);
+	md_error("Error decoding FLAC data.");
+}
 
-    MD__exit_decoder ();
+static int process_block(const FLAC__Frame* frame,
+			 const FLAC__int32* const buffer[],
+			 int i) {
+	int c, b, ret;
 
-    return NULL;
+	for (c = 0; c < frame->header.channels; c++) {
+
+		for (b = 0; b < frame->header.bits_per_sample; b += 8) {
+
+			if ((ret = buf_chunk_append(buffer[c][i] >> b)))
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+static FLAC__StreamDecoderWriteStatus md_flac_write_cb(
+			const FLAC__StreamDecoder* decoder,
+			const FLAC__Frame* frame,
+			const FLAC__int32* const buffer[],
+			void* client_data) {
+	int i;
+
+	for (i = 0; i < frame->header.blocksize; i++) {
+	/* --check for stop --
+	 *
+	 * return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+	 *
+	 */
+		if (process_block(frame, buffer, i))
+			return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+	}
+
+	return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
+}
+
+int md_flac_decode_fp(FILE* file) {
+	FLAC__bool ok = true;
+	FLAC__StreamDecoderInitStatus init_status;
+	FLAC__StreamDecoder* decoder;
+
+	ok = true;
+
+	if (!(decoder = FLAC__stream_decoder_new())) {
+		md_error("Could not create FLAC decoder.");
+		return -EINVAL;
+	}
+
+	init_status = FLAC__stream_decoder_init_FILE(
+				md_flac_decoder,
+				file,
+				md_flac_write_cb,
+				md_flac_metadata_cb,
+				md_flac_error_cb,
+				NULL
+			);
+
+	ok = init_status == FLAC__STREAM_DECODER_INIT_STATUS_OK;
+
+	if (ok)
+		ok = FLAC__stream_decoder_process_until_end_of_stream(
+				md_flac_decoder
+			);
+
+	FLAC__stream_decoder_finish(md_flac_decoder);
+	FLAC__stream_decoder_delete(md_flac_decoder);
+
+	if (!ok) {
+		md_error("Could not process file.");
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 
-void MDFLAC__metadata_callback (const FLAC__StreamDecoder   *decoder,
-                                const FLAC__StreamMetadata  *metadata,
-                                void                        *client_data)
-{
-	(void) decoder, (void) client_data;
-
-	if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
-
-        bool meta_ok = MD__set_metadata ((MD__file_t *)client_data,
-                                         metadata->data.stream_info.sample_rate,
-                                         metadata->data.stream_info.channels,
-                                         metadata->data.stream_info.bits_per_sample,
-                                         metadata->data.stream_info.total_samples);
-        if (!meta_ok) {
-
-            MD__decoding_error_signal ((MD__file_t *)client_data);
-            FLAC__stream_decoder_finish (MDFLAC__decoder);
-            FLAC__stream_decoder_delete (MDFLAC__decoder);
-            MD__exit_decoder ();
-        }
-    }
-}
-
-void MDFLAC__error_callback (const FLAC__StreamDecoder          *MDFLAC__decoder,
-                             FLAC__StreamDecoderErrorStatus     status,
-                             void                               *client_data) {
-
-	(void)MDFLAC__decoder, (void)client_data;
-
-    #ifdef MDCORE__DEBUG
-        MD__log ("Got error callback: %s\n", FLAC__StreamDecoderErrorStatusString[status]);
-    #endif
-
-    MD__decoding_error_signal ((MD__file_t *)client_data);
-    MD__exit_decoder ();
-}
-
-static FLAC__StreamDecoderWriteStatus MDFLAC__write_callback (const FLAC__StreamDecoder     *MDFLAC__decoder,
-                                                              const FLAC__Frame             *frame,
-                                                              const FLAC__int32 *const      buffer[],
-                                                              void                          *client_data) {
-    MD__file_t *MD__file = (MD__file_t *)client_data;
-
-    unsigned int bps_supp = 16;
-
-    unsigned int bps_mult = ((frame->header.bits_per_sample < bps_supp)
-                          ? frame->header.bits_per_sample
-                          : bps_supp) / 8;
-
-    unsigned int compress = 0;
-
-    if (frame->header.bits_per_sample == 24) {
-
-        compress = 1;
-
-    } else if (frame->header.bits_per_sample == 32) {
-
-        compress = 2;
-    }
-
-    for (unsigned int i = 0; i < frame->header.blocksize; i++) {
-
-        if (MD__did_stop (MD__file)) return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-
-        MD__lock (MD__file);
-        for (int c = 0; c < frame->header.channels; c++) {
-
-            for (int b = 0; b < bps_mult; b++ ) {
-
-                if (!MD__add_to_buffer_raw (MD__file, (unsigned char)((buffer [c] [i]
-                                                                       >> (8 * compress))
-                                                                       >> (8 * b)))) {
-                    MD__unlock (MD__file);
-
-                    return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-                }
-            }
-        }
-        MD__unlock (MD__file);
-    }
-
-    return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
-}
