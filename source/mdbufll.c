@@ -3,15 +3,23 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 #include "mdlog.h"
+#include "mdsettings.h"
+#include "mdcoreops.h"
 
-#define get_bufll_pack(buf_pack) \
+#define get_bufll_pack(buf_pack)					\
 	get_pack_data(buf_pack, struct md_bufll_pack_t)
+
+#define get_buf_num() ({						\
+	md_buf_head ? md_buf_last->order - md_buf_head->order + 1 : 0;	\
+})
 
 static struct md_buf_ll {
 	md_buf_chunk_t* chunk;
 	struct md_buf_ll* next;
+	int order;
 } *md_buf_head, *md_buf_last;
 
 struct md_bufll_pack_t {
@@ -19,17 +27,29 @@ struct md_bufll_pack_t {
 	const struct md_buf_ll* curr;
 };
 
-static const md_settings_t* mdsettings;
-static pthread_mutex_t bufll_mutex;
+static struct md_bufll_t {
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+	bool run;
+} md_bufll;
 
-int md_buf_init(const md_settings_t* settings) {
+int md_buf_init(void) {
 
 	md_buf_head = NULL;
 	md_buf_last = NULL;
-	mdsettings = settings;
-	pthread_mutex_init(&bufll_mutex, NULL);
+
+	pthread_mutex_init(&md_bufll.mutex, NULL);
+	pthread_cond_init(&md_bufll.cond, NULL);
+	md_bufll.run = true;
+
+	md_log("Buffer initialized.");
 
 	return 0;
+}
+
+static bool md_buf_add_cond(void) {
+
+	return get_buf_num() >= get_settings()->max_buf_num;
 }
 
 int md_buf_add(md_buf_chunk_t* buf_chunk) {
@@ -44,16 +64,28 @@ int md_buf_add(md_buf_chunk_t* buf_chunk) {
 	new_buf->chunk = buf_chunk;
 	new_buf->next = NULL;
 
-	pthread_mutex_lock(&bufll_mutex);
+	pthread_mutex_lock(&md_bufll.mutex);
+	while (md_bufll.run && md_buf_add_cond())
+		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
+
+	if (!md_bufll.run) {
+		pthread_mutex_unlock(&md_bufll.mutex);
+		return MD_BUF_EXIT;
+	}
+
 	if (!md_buf_head) {
+		new_buf->order = 0;
 		md_buf_head = new_buf;
-		md_buf_last = new_buf;
+		md_buf_last = md_buf_head;
 	}
 	else {
+		new_buf->order = md_buf_last->order + 1;
 		md_buf_last->next = new_buf;
 		md_buf_last = new_buf;
 	}
-	pthread_mutex_unlock(&bufll_mutex);
+
+	pthread_cond_signal(&md_bufll.cond);
+	pthread_mutex_unlock(&md_bufll.mutex);
 
 	return 0;
 }
@@ -70,39 +102,58 @@ static void md_buf_free(struct md_buf_ll* curr) {
 int md_buf_get(const md_buf_chunk_t** buf_chunk) {
 	struct md_buf_ll* temp;
 
-	pthread_mutex_lock(&bufll_mutex);
-	if (md_buf_head) {
-		*buf_chunk = md_buf_head->chunk;
-		temp = md_buf_head;
-		md_buf_head = md_buf_head->next;
-		md_buf_free(temp);
-	}
-	pthread_mutex_unlock(&bufll_mutex);
+	pthread_mutex_lock(&md_bufll.mutex);
+	while (!md_buf_head)
+		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
+
+	*buf_chunk = md_buf_head->chunk;
+	temp = md_buf_head;
+	md_buf_head = md_buf_head->next;
+	md_buf_free(temp);
+
+	pthread_cond_signal(&md_bufll.cond);
+	pthread_mutex_unlock(&md_bufll.mutex);
 
 	return 0;
 }
 
-const md_buf_chunk_t* md_bufll_first(const md_buf_pack_t* buf_pack) {
+md_buf_chunk_t* md_bufll_first(const md_buf_pack_t* buf_pack) {
+
+	if (!get_bufll_pack(buf_pack)->head)
+		return NULL;
 
 	get_bufll_pack(buf_pack)->curr = get_bufll_pack(buf_pack)->head;
+
+	md_exec_event(will_load_chunk, get_bufll_pack(buf_pack)->curr->chunk);
 
 	return get_bufll_pack(buf_pack)->curr->chunk;
 }
 
-const md_buf_chunk_t* md_bufll_next(const md_buf_pack_t* buf_pack) {
+md_buf_chunk_t* md_bufll_next(const md_buf_pack_t* buf_pack) {
 	const struct md_buf_ll* curr;
 
 	curr = get_bufll_pack(buf_pack)->curr;
 	if (!curr)
 		return NULL;
 
-	curr = curr->next;
+	get_bufll_pack(buf_pack)->curr = curr = curr->next;
 
-	return curr ? curr->chunk : NULL;
+	return curr ? md_exec_event(will_load_chunk, curr->chunk), curr->chunk
+		    : NULL;
 }
 
-int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count) {
+static bool md_buf_get_pack_cond(int count, md_pack_mode_t mode) {
+
+	if (mode == MD_PACK_EXACT)
+		return (get_buf_num() < count);
+
+	return !get_buf_num();
+}
+
+int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
+		    md_pack_mode_t pack_mode) {
 	struct md_buf_ll* curr;
+	struct md_bufll_pack_t* md_bufll_pack;
 	int i;
 
 	*buf_pack = malloc(sizeof(**buf_pack));
@@ -111,33 +162,55 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count) {
 		return -ENOMEM;
 	}
 
+	md_bufll_pack = malloc(sizeof(*md_bufll_pack));
+	if (!(md_bufll_pack)) {
+		md_error("Could not allocate memory.");
+		return -ENOMEM;
+	}
+
 	(*buf_pack)->first = md_bufll_first;
 	(*buf_pack)->next = md_bufll_next;
+	(*buf_pack)->data = md_bufll_pack;
 
-	pthread_mutex_lock(&bufll_mutex);
+	pthread_mutex_lock(&md_bufll.mutex);
+	while (md_bufll.run && md_buf_get_pack_cond(*count, pack_mode))
+		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
+
+	if (!md_bufll.run) {
+		pthread_mutex_unlock(&md_bufll.mutex);
+		return MD_BUF_EXIT;
+	}
+
 	get_bufll_pack(*buf_pack)->head = md_buf_head;
 	get_bufll_pack(*buf_pack)->curr = md_buf_head;
 	curr = md_buf_head;
 
 	for (i = 0; i < *count; i++) {
 
-		if (curr)
-			curr = curr->next;
-		else {
-			*count = i + 1;
+		if (!curr) {
+			*count = i;
 			break;
 		}
+		else if (curr->chunk->decoder_done) {
+			curr = curr->next;
+			*count = i;
+			break;
+		}
+		else if (i < *count - 1)
+			curr = curr->next;
 	}
 
 	if (curr) {
-		curr->next = NULL;
 		md_buf_head = curr->next;
+		curr->next = NULL;
 	}
 	else {
 		md_buf_head = NULL;
 		md_buf_last = NULL;
 	}
-	pthread_mutex_unlock(&bufll_mutex);
+
+	pthread_cond_signal(&md_bufll.cond);
+	pthread_mutex_unlock(&md_bufll.mutex);
 
 	return 0;
 }
@@ -146,7 +219,7 @@ int md_buf_deinit(void) {
 	struct md_buf_ll* curr;
 	struct md_buf_ll* next;
 
-	pthread_mutex_lock(&bufll_mutex);
+	pthread_mutex_lock(&md_bufll.mutex);
 	curr = md_buf_head;
 
 	while (curr) {
@@ -155,11 +228,12 @@ int md_buf_deinit(void) {
 		md_buf_free(curr);
 		curr = next;
 	}
-	pthread_mutex_unlock(&bufll_mutex);
+	md_bufll.run = false;
+	pthread_cond_signal(&md_bufll.cond);
+	pthread_mutex_unlock(&md_bufll.mutex);
 
-	pthread_mutex_destroy(&bufll_mutex);
+	pthread_mutex_destroy(&md_bufll.mutex);
 
 	return 0;
 }
-
 

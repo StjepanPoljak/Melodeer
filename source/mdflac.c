@@ -5,10 +5,11 @@
 #include <errno.h>
 
 #include "FLAC/stream_decoder.h"
-#include "mdcore.h"
 #include "mdlog.h"
 #include "mdbufchunk.h"
+#include "mdutils.h"
 
+static md_decoder_t flac_decoder;
 static FLAC__StreamDecoder* md_flac_decoder;
 
 void md_flac_metadata_cb(const FLAC__StreamDecoder* decoder,
@@ -65,8 +66,12 @@ static int process_block(const FLAC__Frame* frame,
 
 		for (b = 0; b < frame->header.bits_per_sample; b += 8) {
 
-			if ((ret = buf_chunk_append(buffer[c][i] >> b)))
+			ret = md_add_decoded_byte(&flac_decoder,
+						  buffer[c][i] >> b);
+			if (ret) {
+				md_error("Error adding decoded byte.");
 				return ret;
+			}
 		}
 	}
 
@@ -96,11 +101,10 @@ static FLAC__StreamDecoderWriteStatus md_flac_write_cb(
 int md_flac_decode_fp(FILE* file) {
 	FLAC__bool ok = true;
 	FLAC__StreamDecoderInitStatus init_status;
-	FLAC__StreamDecoder* decoder;
 
 	ok = true;
 
-	if (!(decoder = FLAC__stream_decoder_new())) {
+	if (!(md_flac_decoder = FLAC__stream_decoder_new())) {
 		md_error("Could not create FLAC decoder.");
 		return -EINVAL;
 	}
@@ -129,7 +133,25 @@ int md_flac_decode_fp(FILE* file) {
 		return -EINVAL;
 	}
 
+	md_decoder_done(&flac_decoder);
+
 	return 0;
 }
 
+bool md_decodes_file(const char* file) {
 
+	return !strcmp(md_extension_of(file), "flac");
+}
+
+static md_decoder_t flac_decoder = {
+	.name = "flac",
+	.chunk = NULL,
+	.ops = {
+		.decodes_file = md_decodes_file,
+		.decode_file = NULL,
+		.decode_fp = md_flac_decode_fp,
+		.decode_bytes = NULL,
+	}
+};
+
+register_decoder(flac, flac_decoder);

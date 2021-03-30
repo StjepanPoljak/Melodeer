@@ -5,8 +5,34 @@
 
 #include "mdlog.h"
 #include "mdll.h"
+#include "mdsettings.h"
+#include "mdcoreops.h"
 
-md_driver_ll* md_driverll_head = NULL;
+static md_driver_ll* md_driverll_head;
+static md_metadata_t* curr_metadata;
+
+#define get_driver_ops() get_settings()->driver->ops
+
+int md_driver_exec_events(md_buf_chunk_t* chunk) {
+	int ret;
+
+	ret = 0;
+
+	if (chunk->metadata && (chunk->metadata != curr_metadata)) {
+		ret = get_driver_ops().set_metadata(chunk->metadata);
+		if (ret) {
+			md_error("Error executing set_metadata().");
+			return ret;
+		}
+		md_exec_event(loaded_metadata, chunk, chunk->metadata);
+		curr_metadata = chunk->metadata;
+	}
+
+	if (chunk->decoder_done)
+		md_exec_event(done_playing_file, chunk);
+
+	return ret;
+}
 
 md_driver_ll* md_driver_ll_add(md_driver_t* driver) {
 	md_driver_ll* last;
@@ -29,7 +55,7 @@ md_driver_ll* md_driver_ll_add(md_driver_t* driver) {
 md_driver_t* md_driver_ll_find(const char* name) {
 	md_driver_ll* curr;
 
-	__ll_find(md_driverll_head, name, curr);
+	__ll_find(md_driverll_head, name, driver, curr);
 
 	return curr->driver;
 }

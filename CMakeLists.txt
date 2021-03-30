@@ -18,8 +18,10 @@ set (SRC_FILES
 	source/mdbufchunk.c
 	source/mddriver.c
 	source/mdcore.c
+	source/mdcoreops.c
 	source/mdflac.c
 	source/mdsettings.c
+	source/mddecoder.c
 	#source/mdmpg123.c
 	#source/mdutils.c
 	#source/mdwav.c
@@ -31,7 +33,7 @@ include_directories (
 
 add_executable (melodeer-exec source/main.c ${SRC_FILES})
 add_library (melodeer SHARED ${SRC_FILES})
-add_definitions(-DCONFIG_DEBUG)
+add_definitions(-DCONFIG_DEBUG -g)
 
 set (MD_LIBS
 	${CMAKE_THREAD_LIBS_INIT}

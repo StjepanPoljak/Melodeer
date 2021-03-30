@@ -2,6 +2,7 @@
 #define MD_DRIVER_H
 
 #include "mdmetadata.h"
+#include "mdbufchunk.h"
 
 typedef enum {
 	MD_DRIVER_PLAYING,
@@ -45,5 +46,7 @@ int md_driver_ll_deinit(void);
 		else \
 			md_log("Loaded driver " #_name "."); \
 	}
+
+int md_driver_exec_events(md_buf_chunk_t*);
 
 #endif

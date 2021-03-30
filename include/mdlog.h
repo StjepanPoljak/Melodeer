@@ -5,18 +5,14 @@
 
 #ifdef CONFIG_DEBUG
 
-#include <string.h>
+#include "mdutils.h"
 
-#define __FILENAME__ ({ \
-	char* fname = strrchr(__FILE__, '/'); \
-	fname ? fname + 1 : __FILE__; \
-})	
+#define __FILENAME__ md_basename_of(__FILE__)
 
 #define md_log_raw(symbol, fmt, ...) \
 do { \
-	printf("(%c) [%s:%d]: %s\n", symbol, \
-	       __FILENAME__, __LINE__, \
-	       fmt, ## __VA_ARGS__); \
+	printf("(%c) [%s:%d]: " fmt "\n", symbol, \
+	       __FILENAME__, __LINE__, ## __VA_ARGS__); \
 } while (0)
 
 #define md_trace(fmt, ...)
@@ -25,19 +21,19 @@ do { \
 
 #define md_log_raw(symbol, fmt, ...) \
 do { \
-	printf("(%c) %s\n", symbol, fmt, ## __VA_ARGS__); \
+	printf("(%c) " fmt "\n", symbol, ## __VA_ARGS__); \
 } while (0)
 
 #define md_trace(fmt, ...) \
 do { \
-	printf("\t-> %s\n", fmt, ## __VA_ARGS__); \
+	printf("\t-> " fmt "\n", ## __VA_ARGS__); \
 } while (0)
 
 #endif
 
 #define md_log(fmt, ...) \
 do { \
-	 md_log_raw('i', fmt, ## __VA_ARGS__); \
+	md_log_raw('i', fmt, ## __VA_ARGS__); \
 } while (0)
 
 #define md_warning(fmt, ...) \

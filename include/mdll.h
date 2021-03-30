@@ -6,7 +6,7 @@ do {							\
 	(_head) = NULL;					\
 } while (0)
 
-#define __ll_add(_head, _new, _temp) 			\
+#define __ll_add(_head, _new, _temp)			\
 do {							\
 	if (!(_head))					\
 		(_head) = (_new);			\
@@ -18,16 +18,20 @@ do {							\
 	}						\
 } while (0)
 
-#define __ll_find(_head, _name, _temp)			\
+#define __ll_for_each(_head, _temp)			\
+	for ((_temp) = (_head); ((_temp));		\
+	     (_temp) = (_temp)->next)			\
+
+#define __ll_find(_head, _name, _field, _temp)		\
 do {							\
 	(_temp) = (_head);				\
 	while ((_temp)					\
 		&& strcmp((_name),			\
-			  (_temp)->driver->name))	\
+			  (_temp)->_field->name))	\
 		(_temp) = (_temp)->next;		\
 } while (0)
 
-#define __ll_deinit(_head, _free_f, _curr, _next) 	\
+#define __ll_deinit(_head, _free_f, _curr, _next)	\
 do {							\
 	(_curr) = (_head);				\
 	while ((_curr)) {				\

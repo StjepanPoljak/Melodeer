@@ -1,23 +1,53 @@
 #include "mdcore.h"
 
+#include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
+#include "mdlog.h"
 #include "mdsettings.h"
+#include "mdbuf.h"
+#include "mddecoder.h"
+#include "mdcoreops.h"
+
+static bool md_running = true;
+
+void md_loaded_metadata(md_buf_chunk_t* chunk, md_metadata_t* metadata) {
+
+	md_log("Loaded metadata (ch=%d, bps=%d, rate=%d)",
+	       metadata->channels, metadata->bps, metadata->sample_rate);
+
+	return;
+}
+
+void md_done_playing_file(md_buf_chunk_t* chunk) {
+
+	md_log("Done playing file.");
+
+	md_running = false;
+
+	return;
+}
+
+static md_core_ops_t md_core_ops = {
+	.will_load_chunk = NULL,
+	.loaded_metadata = md_loaded_metadata,
+	.done_playing_file = md_done_playing_file
+};
 
 int md_init(void) {
 
+	md_set_core_ops(&md_core_ops);
 	load_settings();
-
+	md_buf_init();
 	get_settings()->driver->ops.init();
 
+	md_decoder_start("/home/stjepan/Develop/Melodeer/03 - Scarified.flac");
+
+	while (md_running) { }
+
+	md_buf_deinit();
 	get_settings()->driver->ops.deinit();
-
-	return 0;
-}
-
-int md_set_metadata(md_metadata_t* metadata) {
-
-	get_settings()->driver->ops.set_metadata(metadata);
 
 	return 0;
 }
