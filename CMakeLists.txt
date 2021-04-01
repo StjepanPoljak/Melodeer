@@ -22,6 +22,8 @@ set (SRC_FILES
 	source/mdflac.c
 	source/mdsettings.c
 	source/mddecoder.c
+	source/mdgarbage.c
+	source/mddummydrv.c
 	#source/mdmpg123.c
 	#source/mdutils.c
 	#source/mdwav.c

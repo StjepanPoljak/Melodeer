@@ -11,7 +11,7 @@ typedef struct {
 	int size;
 	md_metadata_t* metadata;
 	bool decoder_done;
-	uint8_t chunk[1];
+	uint8_t chunk[];
 } md_buf_chunk_t;
 
 int md_buf_chunk_init(void);

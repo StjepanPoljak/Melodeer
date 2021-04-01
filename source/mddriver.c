@@ -28,8 +28,10 @@ int md_driver_exec_events(md_buf_chunk_t* chunk) {
 		curr_metadata = chunk->metadata;
 	}
 
-	if (chunk->decoder_done)
-		md_exec_event(done_playing_file, chunk);
+	if (chunk->decoder_done) {
+		md_exec_event(will_load_last_chunk, chunk);
+		free(chunk->metadata);
+	}
 
 	return ret;
 }

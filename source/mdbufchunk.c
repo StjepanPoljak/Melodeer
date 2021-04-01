@@ -14,7 +14,8 @@ int md_buf_chunk_init(void) {
 static md_buf_chunk_t* md_buf_chunk_new(void) {
 	md_buf_chunk_t* curr;
 
-	curr = malloc(sizeof(*curr) + get_settings()->buf_size - 1);
+	curr = malloc(sizeof(*curr)
+		    + sizeof(*curr->chunk) * get_settings()->buf_size);
 	if (!curr) {
 		md_error("Could not allocate memory.");
 		return NULL;

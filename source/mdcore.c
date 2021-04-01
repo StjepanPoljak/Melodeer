@@ -9,8 +9,9 @@
 #include "mdbuf.h"
 #include "mddecoder.h"
 #include "mdcoreops.h"
+#include "mdgarbage.h"
 
-static bool md_running = true;
+static bool volatile md_running = true;
 
 void md_loaded_metadata(md_buf_chunk_t* chunk, md_metadata_t* metadata) {
 
@@ -20,7 +21,7 @@ void md_loaded_metadata(md_buf_chunk_t* chunk, md_metadata_t* metadata) {
 	return;
 }
 
-void md_done_playing_file(md_buf_chunk_t* chunk) {
+void md_will_load_last_chunk(md_buf_chunk_t* chunk) {
 
 	md_log("Done playing file.");
 
@@ -32,7 +33,7 @@ void md_done_playing_file(md_buf_chunk_t* chunk) {
 static md_core_ops_t md_core_ops = {
 	.will_load_chunk = NULL,
 	.loaded_metadata = md_loaded_metadata,
-	.done_playing_file = md_done_playing_file
+	.will_load_last_chunk = md_will_load_last_chunk
 };
 
 int md_init(void) {
@@ -46,8 +47,7 @@ int md_init(void) {
 
 	while (md_running) { }
 
-	md_buf_deinit();
-	get_settings()->driver->ops.deinit();
+	md_deinit();
 
 	return 0;
 }
@@ -63,4 +63,13 @@ char* md_get_logo(void) {
 			"    ||||";
 
 	return strdup(logo_data);
+}
+
+void md_deinit(void) {
+
+	md_buf_deinit();
+	get_settings()->driver->ops.deinit();
+	md_garbage_deinit();
+
+	return;
 }

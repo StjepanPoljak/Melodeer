@@ -12,7 +12,7 @@ static md_settings_t settings = {
 
 void load_settings(void) {
 
-	settings.driver = md_driver_ll_find("openal");
+	settings.driver = md_driver_ll_find("dummy");
 
 	return;
 }

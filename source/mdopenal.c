@@ -11,6 +11,7 @@
 #include "mdmetadata.h"
 #include "mdbuf.h"
 #include "mdlog.h"
+#include "mdgarbage.h"
 
 static struct md_openal_t {
 	ALCdevice* device;
@@ -72,7 +73,7 @@ int md_openal_deinit(void) {
 	return 0;
 }
 
-static int md_openal_add_to_buffer(const md_buf_pack_t* buf_pack,
+static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 				   int total, int get_pack_ret) {
 	md_buf_chunk_t* curr_chunk;
 	int i, ret;
@@ -114,6 +115,8 @@ static int md_openal_add_to_buffer(const md_buf_pack_t* buf_pack,
 
 	if (!is_playing)
 		alSourcePlay(md_openal.source);
+
+	md_bufll_clean_pack(buf_pack);
 
 	return 0;
 }

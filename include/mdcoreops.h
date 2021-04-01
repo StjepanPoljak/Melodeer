@@ -7,7 +7,7 @@
 typedef struct {
 	void(*loaded_metadata)(md_buf_chunk_t*, md_metadata_t*);
 	void(*will_load_chunk)(md_buf_chunk_t*);
-	void(*done_playing_file)(md_buf_chunk_t*);
+	void(*will_load_last_chunk)(md_buf_chunk_t*);
 } md_core_ops_t;
 
 void md_set_core_ops(md_core_ops_t*);
