@@ -228,6 +228,8 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 
 	if (!md_bufll.run) {
 		pthread_mutex_unlock(&md_bufll.mutex);
+		free(*buf_pack);
+		free(md_bufll_pack);
 		return MD_BUF_EXIT;
 	}
 

@@ -43,7 +43,8 @@ int md_init(void) {
 	md_buf_init();
 	get_settings()->driver->ops.init();
 
-	md_decoder_start("/home/stjepan/Develop/Melodeer/03 - Scarified.flac");
+//	md_decoder_start("/home/stjepan/Develop/Melodeer/03 - Scarified.flac");
+	md_decoder_start("CMakeLists.txt");
 
 	while (md_running) { }
 
@@ -70,6 +71,9 @@ void md_deinit(void) {
 	md_buf_deinit();
 	get_settings()->driver->ops.deinit();
 	md_garbage_deinit();
+
+	md_decoder_ll_deinit();
+	md_driver_ll_deinit();
 
 	return;
 }

@@ -11,6 +11,7 @@
 
 static md_decoder_ll* md_decoderll_head;
 static md_metadata_t* curr_metadata;
+static pthread_t decoder_thread;
 
 static int md_decode_as_fp(const char* fpath,
 			   md_decoder_t* fdecoder) {
@@ -43,7 +44,6 @@ static void* md_decoder_handler(void* data) {
 }
 
 int md_decoder_start(const char* fpath) {
-	pthread_t decoder_thread;
 	int ret;
 
 	ret = 0;
@@ -53,6 +53,8 @@ int md_decoder_start(const char* fpath) {
 		md_error("Could not create decoder thread.");
 		return ret;
 	}
+
+	pthread_join(decoder_thread, NULL);
 
 	return ret;
 }
@@ -84,6 +86,7 @@ int md_add_decoded_byte(md_decoder_t* decoder, uint8_t byte) {
 void md_decoder_done(md_decoder_t* decoder) {
 
 	decoder->chunk->decoder_done = true;
+	decoder->chunk->metadata = curr_metadata;
 	md_buf_add(decoder->chunk);
 	decoder->chunk = NULL;
 

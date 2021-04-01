@@ -138,7 +138,7 @@ int md_flac_decode_fp(FILE* file) {
 	return 0;
 }
 
-bool md_decodes_file(const char* file) {
+bool md_flac_decodes_file(const char* file) {
 
 	return !strcmp(md_extension_of(file), "flac");
 }
@@ -147,7 +147,7 @@ static md_decoder_t flac_decoder = {
 	.name = "flac",
 	.chunk = NULL,
 	.ops = {
-		.decodes_file = md_decodes_file,
+		.decodes_file = md_flac_decodes_file,
 		.decode_file = NULL,
 		.decode_fp = md_flac_decode_fp,
 		.decode_bytes = NULL,

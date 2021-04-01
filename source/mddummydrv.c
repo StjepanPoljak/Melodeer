@@ -42,6 +42,9 @@ static int md_dummy_add_to_buffer(md_buf_pack_t* buf_pack,
 
 	while (curr_chunk) {
 
+		for (int j=0; j<curr_chunk->size; j++)
+			printf("%c", curr_chunk->chunk[j]);
+
 		ret = md_driver_exec_events(curr_chunk);
 		if (ret) {
 			md_error("Error executing events.");

@@ -24,6 +24,7 @@ set (SRC_FILES
 	source/mddecoder.c
 	source/mdgarbage.c
 	source/mddummydrv.c
+	source/mddummydec.c
 	#source/mdmpg123.c
 	#source/mdutils.c
 	#source/mdwav.c
@@ -42,7 +43,7 @@ set (MD_LIBS
 	FLAC
 	openal
 	mpg123
-	m)
+	m) # m is for math
 
 target_link_libraries (melodeer ${MD_LIBS})
 target_link_libraries (melodeer-exec ${MD_LIBS})
