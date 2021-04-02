@@ -1,7 +1,7 @@
-find_package (OpenAL REQUIRED)
+set(OPENAL_SOURCES
+	${CMAKE_CURRENT_SOURCE_DIR}/mdopenal.c)
 
-target_sources(melodeer PRIVATE mdopenal.c)
-target_sources(melodeer-exec PRIVATE mdopenal.c)
+find_package(OpenAL REQUIRED)
 
-target_link_libraries(melodeer openal)
-target_link_libraries(melodeer-exec openal)
+target_sources(melodeer PRIVATE ${OPENAL_SOURCES})
+target_sources(melodeer-exec PRIVATE ${OPENAL_SOURCES})

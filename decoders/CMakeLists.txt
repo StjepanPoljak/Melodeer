@@ -1,5 +1,5 @@
 set (DECODER_SOURCES
-	mddecoder.c)
+	${CMAKE_CURRENT_SOURCE_DIR}/mddecoder.c)
 
 target_include_directories(melodeer PRIVATE include)
 target_include_directories(melodeer-exec PRIVATE include)

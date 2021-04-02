@@ -1,8 +1,8 @@
 set (CORE_SOURCES
-	main.c
-	mdcore.c
-	mdcoreops.c
-	mdsettings.c)
+	${CMAKE_CURRENT_SOURCE_DIR}/main.c
+	${CMAKE_CURRENT_SOURCE_DIR}/mdcore.c
+	${CMAKE_CURRENT_SOURCE_DIR}/mdcoreops.c
+	${CMAKE_CURRENT_SOURCE_DIR}/mdsettings.c)
 
 target_include_directories(melodeer PRIVATE include)
 target_include_directories(melodeer-exec PRIVATE include)

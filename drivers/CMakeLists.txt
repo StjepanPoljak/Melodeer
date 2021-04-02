@@ -1,5 +1,5 @@
 set (DRIVER_SOURCES
-	mddriver.c)
+	${CMAKE_CURRENT_SOURCE_DIR}/mddriver.c)
 
 target_include_directories(melodeer PRIVATE include)
 target_include_directories(melodeer-exec PRIVATE include)
