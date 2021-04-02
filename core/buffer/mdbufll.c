@@ -32,6 +32,7 @@ static struct md_bufll_t {
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	bool run;
+	bool error;
 } md_bufll;
 
 int md_buf_init(void) {
@@ -47,6 +48,7 @@ int md_buf_init(void) {
 	md_buf_head = NULL;
 	md_buf_last = NULL;
 	md_bufll.run = true;
+	md_bufll.error = false;
 
 	md_log("Buffer initialized.");
 
@@ -58,8 +60,22 @@ static bool md_buf_add_cond(void) {
 	return get_buf_num() >= get_settings()->max_buf_num;
 }
 
+void md_buf_signal_error(void) {
+
+	pthread_mutex_lock(&md_bufll.mutex);
+	md_bufll.run = false;
+	md_bufll.error = true;
+	pthread_cond_signal(&md_bufll.cond);
+	pthread_mutex_unlock(&md_bufll.mutex);
+
+	return;
+}
+
 int md_buf_add(md_buf_chunk_t* buf_chunk) {
 	struct md_buf_ll* new_buf;
+	int ret;
+
+	ret = 0;
 
 	new_buf = malloc(sizeof(*new_buf));
 	if (!new_buf) {
@@ -75,8 +91,10 @@ int md_buf_add(md_buf_chunk_t* buf_chunk) {
 		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
 
 	if (!md_bufll.run) {
+		ret = md_bufll.error ? MD_BUF_ERROR : MD_BUF_EXIT;
+		md_bufll.error = false;
 		pthread_mutex_unlock(&md_bufll.mutex);
-		return MD_BUF_EXIT;
+		return ret;
 	}
 
 	if (!md_buf_head) {
@@ -93,7 +111,7 @@ int md_buf_add(md_buf_chunk_t* buf_chunk) {
 	pthread_cond_signal(&md_bufll.cond);
 	pthread_mutex_unlock(&md_bufll.mutex);
 
-	return 0;
+	return ret;
 }
 
 static void md_buf_free(struct md_buf_ll* curr) {
@@ -166,7 +184,7 @@ static void md_bufll_free(struct md_buf_ll* curr) {
 	return;
 }
 
-void md_bufll_clean_pack(md_buf_pack_t* buf_pack) {
+void md_buf_clean_pack(md_buf_pack_t* buf_pack) {
 	struct md_buf_ll* curr;
 	struct md_buf_ll* next;
 
@@ -227,10 +245,12 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
 
 	if (!md_bufll.run) {
+		ret = md_bufll.error ? MD_BUF_ERROR : MD_BUF_EXIT;
+		md_bufll.error = false;
 		pthread_mutex_unlock(&md_bufll.mutex);
 		free(*buf_pack);
 		free(md_bufll_pack);
-		return MD_BUF_EXIT;
+		return ret;
 	}
 
 	get_bufll_pack(*buf_pack)->head = md_buf_head;

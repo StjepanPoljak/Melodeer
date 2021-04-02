@@ -10,7 +10,6 @@
 #include "mdutils.h"
 
 static md_decoder_t flac_decoder;
-static FLAC__StreamDecoder* md_flac_decoder;
 
 void md_flac_metadata_cb(const FLAC__StreamDecoder* decoder,
 			 const FLAC__StreamMetadata* metadata,
@@ -44,8 +43,7 @@ fail_metadata:
 	free(meta);
 
 early_fail_metadata:
-	FLAC__stream_decoder_finish(md_flac_decoder);
-	FLAC__stream_decoder_delete(md_flac_decoder);
+	md_decoder_done(&flac_decoder);
 
 	return;
 }
@@ -99,14 +97,18 @@ static FLAC__StreamDecoderWriteStatus md_flac_write_cb(
 }
 
 int md_flac_decode_fp(FILE* file) {
-	FLAC__bool ok = true;
+	FLAC__bool ok;
 	FLAC__StreamDecoderInitStatus init_status;
+	FLAC__StreamDecoder* md_flac_decoder;
+	int ret;
 
+	ret = 0;
 	ok = true;
 
 	if (!(md_flac_decoder = FLAC__stream_decoder_new())) {
 		md_error("Could not create FLAC decoder.");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto exit_decoder;
 	}
 
 	init_status = FLAC__stream_decoder_init_FILE(
@@ -130,9 +132,11 @@ int md_flac_decode_fp(FILE* file) {
 
 	if (!ok) {
 		md_error("Could not process file.");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto exit_decoder;
 	}
 
+exit_decoder:
 	md_decoder_done(&flac_decoder);
 
 	return 0;

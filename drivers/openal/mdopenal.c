@@ -116,7 +116,7 @@ static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 	if (!is_playing)
 		alSourcePlay(md_openal.source);
 
-	md_bufll_clean_pack(buf_pack);
+	md_buf_clean_pack(buf_pack);
 
 	return 0;
 }

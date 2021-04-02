@@ -54,8 +54,6 @@ int md_decoder_start(const char* fpath) {
 		return ret;
 	}
 
-	pthread_join(decoder_thread, NULL);
-
 	return ret;
 }
 
@@ -85,10 +83,21 @@ int md_add_decoded_byte(md_decoder_t* decoder, uint8_t byte) {
 
 void md_decoder_done(md_decoder_t* decoder) {
 
-	decoder->chunk->decoder_done = true;
-	decoder->chunk->metadata = curr_metadata;
-	md_buf_add(decoder->chunk);
-	decoder->chunk = NULL;
+	if (decoder->chunk) {
+		decoder->chunk->decoder_done = true;
+		decoder->chunk->metadata = curr_metadata;
+		md_buf_add(decoder->chunk);
+		decoder->chunk = NULL;
+	}
+
+	pthread_exit(NULL);
+
+	return;
+}
+
+void md_decoder_deinit(void) {
+
+	//pthread_join(decoder_thread, NULL);
 
 	return;
 }

@@ -57,7 +57,7 @@ static int md_dummy_add_to_buffer(md_buf_pack_t* buf_pack,
 
 	md_log("pack_cnt = %d (%d)", pack_cnt, i);
 
-	md_bufll_clean_pack(buf_pack);
+	md_buf_clean_pack(buf_pack);
 
 	return 0;
 }
