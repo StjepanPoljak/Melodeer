@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #include "mdlog.h"
 #include "mdsettings.h"
@@ -39,12 +40,15 @@ static md_core_ops_t md_core_ops = {
 int md_init(void) {
 
 	md_set_core_ops(&md_core_ops);
-	load_settings();
+	if (load_settings()) {
+		md_error("Error loading settings.");
+		return -EINVAL;
+	}
 	md_buf_init();
 	get_settings()->driver->ops.init();
 
-	md_decoder_start("/home/stjepan/Develop/Melodeer/03 - Scarified.flac");
-//	md_decoder_start("CMakeLists.txt");
+//	md_decoder_start("/home/stjepan/Develop/Melodeer/03 - Scarified.flac", "dummy");
+	md_decoder_start("CMakeLists.txt", "dummy");
 
 	while (md_running) { }
 
@@ -70,6 +74,7 @@ void md_deinit(void) {
 
 	md_buf_deinit();
 	get_settings()->driver->ops.deinit();
+	md_driver_unload(get_settings()->driver);
 	md_garbage_deinit();
 
 	md_decoder_ll_deinit();

@@ -42,7 +42,7 @@ md_driver_ll* md_driver_ll_add(md_driver_t* driver) {
 
 	new = malloc(sizeof(*new));
 	if (!new) {
-		md_error("Could not allocate memory.\n");
+		md_error("Could not allocate memory.");
 		return NULL;
 	}
 
@@ -54,12 +54,39 @@ md_driver_ll* md_driver_ll_add(md_driver_t* driver) {
 	return new;
 }
 
+void md_driver_unload(md_driver_t* driver) {
+
+	if (driver->handle)
+		dlclose(driver->handle);
+
+	return;
+}
+
+int md_driver_try_load(md_driver_t* driver) {
+
+	if (driver->lib && !(driver->handle = dlopen(driver->lib, RTLD_NOW))) {
+		md_error("Could not find library %s for driver %s.",
+			 driver->lib, driver->name);
+
+		return -EINVAL;
+	}
+
+	if (!driver->ops.load_symbols()) {
+		md_error("Could not load %s symbols.", driver->name);
+		md_driver_unload(driver);
+
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 md_driver_t* md_driver_ll_find(const char* name) {
 	md_driver_ll* curr;
 
 	__ll_find(md_driverll_head, name, driver, curr);
 
-	return curr->driver;
+	return curr ? curr->driver : NULL;
 }
 
 static void md_driver_ll_free(md_driver_ll* curr) {

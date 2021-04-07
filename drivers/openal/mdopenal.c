@@ -13,6 +13,8 @@
 #include "mdlog.h"
 #include "mdgarbage.h"
 
+md_driver_t openal_driver;
+
 static struct md_openal_t {
 	ALCdevice* device;
 	ALCcontext* context;
@@ -23,11 +25,76 @@ static struct md_openal_t {
 	ALuint sample_rate;
 } md_openal;
 
+#define OPENAL_SYMBOLS(FUN)		\
+	FUN(alGetSourcei);		\
+	FUN(alDeleteSources);		\
+	FUN(alDeleteBuffers);		\
+	FUN(alcGetContextsDevice);	\
+	FUN(alcMakeContextCurrent);	\
+	FUN(alcDestroyContext);		\
+	FUN(alcCloseDevice);		\
+	FUN(alSourceUnqueueBuffers);	\
+	FUN(alBufferData);		\
+	FUN(alSourceQueueBuffers);	\
+	FUN(alSourcePlay);		\
+	FUN(alSourceStop);		\
+	FUN(alcOpenDevice);		\
+	FUN(alcCreateContext);		\
+	FUN(alGenSources);		\
+	FUN(alGenBuffers);		\
+	FUN(alGetError);
+
+OPENAL_SYMBOLS(md_driver_define_fptr);
+
+#define alGetSourcei alGetSourcei_ptr
+#define alDeleteSources alDeleteSources_ptr
+#define alDeleteBuffers alDeleteBuffers_ptr
+#define alcGetContextsDevice alcGetContextsDevice_ptr
+#define alcMakeContextCurrent alcMakeContextCurrent_ptr
+#define alcDestroyContext alcDestroyContext_ptr
+#define alcCloseDevice alcCloseDevice_ptr
+#define alSourceUnqueueBuffers alSourceUnqueueBuffers_ptr
+#define alBufferData alBufferData_ptr
+#define alSourceQueueBuffers alSourceQueueBuffers_ptr
+#define alSourcePlay alSourcePlay_ptr
+#define alSourceStop alSourceStop_ptr
+#define alcOpenDevice alcOpenDevice_ptr
+#define alcCreateContext alcCreateContext_ptr
+#define alGenSources alGenSources_ptr
+#define alGenBuffers alGenBuffers_ptr
+#define alGetError alGetError_ptr
+
 #define md_openal_pop_error(fmt, ...) ({				\
 	ALCenum error = alGetError();					\
 	error != AL_NO_ERROR						\
 	      ? ({ md_error(fmt, ## __VA_ARGS__); }), error : 0;	\
 })
+
+#define md_openal_load_sym(_func) \
+	md_driver_load_sym(_func ##_ptr, &(openal_driver), error)
+
+int md_openal_load_symbols(void) {
+	char** error;
+
+	if (!openal_driver.handle) {
+		md_error("OpenAL library hasn't been opened.");
+
+		return -EINVAL;
+	}
+
+	*error = 0;
+
+	OPENAL_SYMBOLS(md_openal_load_sym);
+
+	if (*error) {
+		md_error("Could not load symbol: %s", *error);
+		free(*error);
+
+		return -EINVAL;
+	}
+
+	return 0;
+}
 
 static bool md_openal_is_playing() {
 	ALint val;
@@ -227,6 +294,8 @@ int md_openal_stop(void) {
 
 md_driver_t openal_driver = {
 	.name = "openal",
+	.lib = "openal",
+	.handle = NULL,
 	.ops = {
 		.init = md_openal_init,
 		.set_metadata = md_openal_set_metadata,

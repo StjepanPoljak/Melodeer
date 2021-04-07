@@ -48,9 +48,9 @@ int md_dummy_decode_fp(FILE* file) {
 			return ret;
 		}
 
-	md_decoder_done(&dummy_decoder);
-
 	fclose(file);
+
+	md_decoder_done(&dummy_decoder);
 
 	return 0;
 }

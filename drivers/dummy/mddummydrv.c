@@ -121,6 +121,8 @@ int md_dummy_stop(void) {
 
 md_driver_t dummy_driver = {
 	.name = "dummy",
+	.lib = NULL,
+	.handle = NULL,
 	.ops = {
 		.init = md_dummy_init,
 		.set_metadata = md_dummy_set_metadata,

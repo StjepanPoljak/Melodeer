@@ -1,6 +1,9 @@
 #include "mdsettings.h"
 
 #include <stdlib.h>
+#include <errno.h>
+
+#include "mdlog.h"
 
 static md_settings_t settings = {
 	.buf_size = 4096,
@@ -10,11 +13,17 @@ static md_settings_t settings = {
 	.driver = NULL
 };
 
-void load_settings(void) {
+int load_settings(void) {
+	const char* driver_name = "dummy";
 
-	settings.driver = md_driver_ll_find("openal");
+	settings.driver = md_driver_ll_find(driver_name);
 
-	return;
+	if (!settings.driver) {
+		md_error("Could not load driver %s.", driver_name);
+		return -EINVAL;
+	}
+
+	return md_driver_try_load(settings.driver);
 }
 
 md_settings_t* get_settings(void) {

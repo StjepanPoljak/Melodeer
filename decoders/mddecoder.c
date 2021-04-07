@@ -9,6 +9,14 @@
 #include "mdbuf.h"
 #include "mdsettings.h"
 
+#define decoder_data(DATA) \
+	((md_decoder_data_t*)DATA)
+
+typedef struct {
+	char* fpath;
+	char* force_decoder;
+} md_decoder_data_t;
+
 static md_decoder_ll* md_decoderll_head;
 static md_metadata_t* curr_metadata;
 static pthread_t decoder_thread;
@@ -26,30 +34,61 @@ static int md_decode_as_fp(const char* fpath,
 	return fdecoder->ops.decode_fp(f);
 }
 
+static md_decoder_t* md_decoder_ll_find(const char* name) {
+	md_decoder_ll* curr;
+
+	__ll_find(md_decoderll_head, name, decoder, curr);
+
+	return curr ? curr->decoder : NULL;
+}
+
 static void* md_decoder_handler(void* data) {
 	md_decoder_t* fdecoder;
-	const char* fpath;
 
-	fpath = (const char*)data;
-
-	if (!(fdecoder = md_decoder_for(fpath))) {
-		md_error("Could not find decoder for %s.", fpath);
-		return NULL;
+	if (decoder_data(data)->force_decoder) {
+		if (!(fdecoder = md_decoder_ll_find(
+				decoder_data(data)->force_decoder))) {
+			md_error("Could not find decoder %s.",
+				decoder_data(data)->force_decoder);
+			goto exit_decoder_handler;
+		}
+	}
+	else if (!(fdecoder = md_decoder_for(decoder_data(data)->fpath))) {
+		md_error("Could not find decoder for %s.",
+			 decoder_data(data)->fpath);
+		goto exit_decoder_handler;
 	}
 
 	if (fdecoder->ops.decode_fp)
-		md_decode_as_fp(fpath, fdecoder);
+		md_decode_as_fp(decoder_data(data)->fpath, fdecoder);
+
+exit_decoder_handler:
+	free(decoder_data(data)->fpath);
+	if (decoder_data(data)->force_decoder)
+		free(decoder_data(data)->force_decoder);
+	free(data);
 
 	return NULL;
 }
 
-int md_decoder_start(const char* fpath) {
+int md_decoder_start(const char* fpath, const char* decoder) {
 	int ret;
+	md_decoder_data_t* decoder_data;
+
+	decoder_data = malloc(sizeof(*decoder_data));
+	if (!decoder_data) {
+		md_error("Could not allocate memory.");
+		return -ENOMEM;
+	}
+
+	decoder_data->fpath = strdup(fpath);
+	decoder_data->force_decoder = strdup(decoder);
 
 	ret = 0;
 
 	if ((ret = pthread_create(&decoder_thread, NULL,
-				  md_decoder_handler, (void*)fpath))) {
+				  md_decoder_handler,
+				  (void*)decoder_data))) {
 		md_error("Could not create decoder thread.");
 		return ret;
 	}
@@ -89,8 +128,6 @@ void md_decoder_done(md_decoder_t* decoder) {
 		md_buf_add(decoder->chunk);
 		decoder->chunk = NULL;
 	}
-
-	pthread_exit(NULL);
 
 	return;
 }

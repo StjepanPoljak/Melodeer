@@ -42,7 +42,7 @@ int md_decoder_ll_deinit(void);
 			md_log("Loaded decoder " #_name ".");	\
 	}
 
-int md_decoder_start(const char*);
+int md_decoder_start(const char*, const char*);
 int md_add_decoded_byte(md_decoder_t*, uint8_t);
 int md_set_metadata(md_metadata_t*);
 void md_decoder_done(md_decoder_t*);

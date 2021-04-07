@@ -11,7 +11,7 @@ typedef struct {
 	md_driver_t* driver;
 } md_settings_t;
 
-void load_settings(void);
+int load_settings(void);
 md_settings_t* get_settings(void);
 
 #endif

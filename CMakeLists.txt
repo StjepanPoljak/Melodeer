@@ -16,7 +16,8 @@ add_definitions(-DCONFIG_DEBUG -g)
 
 set (MD_LIBS
 	${CMAKE_THREAD_LIBS_INIT}
-	openal
+	dl
+	#openal
 	FLAC
 	mpg123
 	m) # m is for math
