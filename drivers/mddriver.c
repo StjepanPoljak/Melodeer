@@ -64,14 +64,17 @@ void md_driver_unload(md_driver_t* driver) {
 
 int md_driver_try_load(md_driver_t* driver) {
 
-	if (driver->lib && !(driver->handle = dlopen(driver->lib, RTLD_NOW))) {
+	if (!driver->lib)
+		return 0;
+
+	if (!(driver->handle = dlopen(driver->lib, RTLD_NOW))) {
 		md_error("Could not find library %s for driver %s.",
 			 driver->lib, driver->name);
 
 		return -EINVAL;
 	}
 
-	if (!driver->ops.load_symbols()) {
+	if (driver->ops.load_symbols()) {
 		md_error("Could not load %s symbols.", driver->name);
 		md_driver_unload(driver);
 

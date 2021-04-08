@@ -82,7 +82,7 @@ int md_decoder_start(const char* fpath, const char* decoder) {
 	}
 
 	decoder_data->fpath = strdup(fpath);
-	decoder_data->force_decoder = strdup(decoder);
+	decoder_data->force_decoder = decoder ? strdup(decoder) : NULL;
 
 	ret = 0;
 

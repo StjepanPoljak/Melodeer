@@ -46,6 +46,37 @@ static struct md_openal_t {
 
 OPENAL_SYMBOLS(md_driver_define_fptr);
 
+#define md_openal_pop_error(fmt, ...) ({				\
+	ALCenum error = alGetError();					\
+	error != AL_NO_ERROR						\
+	      ? ({ md_error(fmt, ## __VA_ARGS__); }), error : 0;	\
+})
+
+#define md_openal_load_sym(_func) \
+	md_driver_load_sym(_func, &(openal_driver), &(error))
+
+int md_openal_load_symbols(void) {
+	int error;
+
+	if (!openal_driver.handle) {
+		md_error("OpenAL library hasn't been opened.");
+
+		return -EINVAL;
+	}
+
+	error = 0;
+
+	OPENAL_SYMBOLS(md_openal_load_sym);
+
+	if (error) {
+		md_error("Could not load symbols.");
+
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 #define alGetSourcei alGetSourcei_ptr
 #define alDeleteSources alDeleteSources_ptr
 #define alDeleteBuffers alDeleteBuffers_ptr
@@ -63,38 +94,6 @@ OPENAL_SYMBOLS(md_driver_define_fptr);
 #define alGenSources alGenSources_ptr
 #define alGenBuffers alGenBuffers_ptr
 #define alGetError alGetError_ptr
-
-#define md_openal_pop_error(fmt, ...) ({				\
-	ALCenum error = alGetError();					\
-	error != AL_NO_ERROR						\
-	      ? ({ md_error(fmt, ## __VA_ARGS__); }), error : 0;	\
-})
-
-#define md_openal_load_sym(_func) \
-	md_driver_load_sym(_func ##_ptr, &(openal_driver), error)
-
-int md_openal_load_symbols(void) {
-	char** error;
-
-	if (!openal_driver.handle) {
-		md_error("OpenAL library hasn't been opened.");
-
-		return -EINVAL;
-	}
-
-	*error = 0;
-
-	OPENAL_SYMBOLS(md_openal_load_sym);
-
-	if (*error) {
-		md_error("Could not load symbol: %s", *error);
-		free(*error);
-
-		return -EINVAL;
-	}
-
-	return 0;
-}
 
 static bool md_openal_is_playing() {
 	ALint val;
@@ -294,9 +293,10 @@ int md_openal_stop(void) {
 
 md_driver_t openal_driver = {
 	.name = "openal",
-	.lib = "openal",
+	.lib = "libopenal.so",
 	.handle = NULL,
 	.ops = {
+		.load_symbols = md_openal_load_symbols,
 		.init = md_openal_init,
 		.set_metadata = md_openal_set_metadata,
 		.play = md_openal_play,

@@ -55,9 +55,11 @@ int md_driver_ll_deinit(void);
 	}
 
 #define md_driver_load_sym(_func, _driver, _error) do {		\
-	_func = dlsym((_driver)->handle, #_func);		\
-	if (dlerror() && !(*(_error)))				\
-		*(_error) = strdup(#_func);			\
+	_func ##_ptr  = dlsym((_driver)->handle, #_func);	\
+	if (dlerror()) {					\
+		md_error("Error loading " #_func ".");		\
+		*(_error) = -EINVAL;				\
+	}							\
 } while (0)
 
 #define md_driver_define_fptr(_var)	\

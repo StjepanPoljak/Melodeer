@@ -1,3 +1,8 @@
-build/*.o
-/melodeer
-mdcore.log
+melodeer-exec
+libmelodeer.so
+CMakeFiles
+Makefile
+tags
+*_install.cmake
+install_manifest.txt
+CMakeCache.txt
