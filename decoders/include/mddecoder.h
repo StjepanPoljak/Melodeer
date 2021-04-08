@@ -7,18 +7,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "mdmetadata.h"
 #include "mdbufchunk.h"
+
+struct md_decoder_data_t;
 
 typedef struct {
 	bool(*decodes_file)(const char*);
 	int(*decode_file)(const char*);
-	int(*decode_fp)(FILE*);
+	int(*decode_fp)(struct md_decoder_data_t*);
 	int(*decode_bytes)(uint8_t*);
 } md_decoder_ops;
 
 typedef struct {
 	const char* name;
-	md_buf_chunk_t* chunk;
 	md_decoder_ops ops;
 } md_decoder_t;
 
@@ -43,8 +45,21 @@ int md_decoder_ll_deinit(void);
 	}
 
 int md_decoder_start(const char*, const char*);
-int md_add_decoded_byte(md_decoder_t*, uint8_t);
-int md_set_metadata(md_metadata_t*);
-void md_decoder_done(md_decoder_t*);
+
+typedef struct md_decoder_data_t {
+	char* fpath;
+	char* force_decoder;
+	md_decoder_t* fdecoder;
+	md_metadata_t* metadata;
+	md_buf_chunk_t* chunk;
+	void* data;
+} md_decoder_data_t;
+
+int md_add_decoded_byte(md_decoder_data_t*, uint8_t);
+void md_decoder_done(md_decoder_data_t*);
+
+#define md_set_metadata(_decoder_data, _metadata) do {	\
+	(_decoder_data)->metadata = (_metadata);	\
+} while (0)
 
 #endif

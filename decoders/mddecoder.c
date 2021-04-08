@@ -12,26 +12,21 @@
 #define decoder_data(DATA) \
 	((md_decoder_data_t*)DATA)
 
-typedef struct {
-	char* fpath;
-	char* force_decoder;
-} md_decoder_data_t;
-
 static md_decoder_ll* md_decoderll_head;
-static md_metadata_t* curr_metadata;
 static pthread_t decoder_thread;
 
-static int md_decode_as_fp(const char* fpath,
-			   md_decoder_t* fdecoder) {
+static int md_decode_as_fp(md_decoder_data_t* decoder_data) {
 	FILE* f;
 
-	f = fopen(fpath, "rw");
+	f = fopen(decoder_data->fpath, "rw");
 	if (!f) {
-		md_error("Could not open file %s.", fpath);
+		md_error("Could not open file %s.", decoder_data->fpath);
 		return -EINVAL;
 	}
 
-	return fdecoder->ops.decode_fp(f);
+	decoder_data->data = (void*)f;
+
+	return decoder_data->fdecoder->ops.decode_fp(decoder_data);
 }
 
 static md_decoder_t* md_decoder_ll_find(const char* name) {
@@ -59,8 +54,10 @@ static void* md_decoder_handler(void* data) {
 		goto exit_decoder_handler;
 	}
 
+	decoder_data(data)->fdecoder = fdecoder;
+
 	if (fdecoder->ops.decode_fp)
-		md_decode_as_fp(decoder_data(data)->fpath, fdecoder);
+		md_decode_as_fp(decoder_data(data));
 
 exit_decoder_handler:
 	free(decoder_data(data)->fpath);
@@ -96,37 +93,39 @@ int md_decoder_start(const char* fpath, const char* decoder) {
 	return ret;
 }
 
-int md_set_metadata(md_metadata_t* metadata) {
-
-	curr_metadata = metadata;
-
-	return 0;
-}
-
-int md_add_decoded_byte(md_decoder_t* decoder, uint8_t byte) {
+int md_add_decoded_byte(md_decoder_data_t* decoder_data, uint8_t byte) {
 	md_buf_chunk_t* old;
+	//md_decoder_t* decoder;
 
-	old = decoder->chunk;
+	//decoder = decoder_data->fdecoder;
+	old = decoder_data->chunk;
 
-	decoder->chunk = md_buf_chunk_append_byte(decoder->chunk, byte);
-	if (!decoder->chunk)
+	decoder_data->chunk = md_buf_chunk_append_byte(decoder_data->chunk,
+						       byte);
+	if (!decoder_data->chunk)
 
 		return ({ md_error("Could not append byte."); }), -ENOMEM;
 
-	else if (old && (decoder->chunk != old))
+	else if (old && (decoder_data->chunk != old)) {
 
-		return old->metadata = curr_metadata, md_buf_add(old);
+		decoder_data->chunk->metadata = decoder_data->metadata;
+
+		return md_buf_add(old);
+	}
 
 	return 0;
 }
 
-void md_decoder_done(md_decoder_t* decoder) {
+void md_decoder_done(md_decoder_data_t* decoder_data) {
+	//md_decoder_t* decoder;
 
-	if (decoder->chunk) {
-		decoder->chunk->decoder_done = true;
-		decoder->chunk->metadata = curr_metadata;
-		md_buf_add(decoder->chunk);
-		decoder->chunk = NULL;
+	//decoder = decoder_data->fdecoder;
+
+	if (decoder_data->chunk) {
+		decoder_data->chunk->decoder_done = true;
+		decoder_data->chunk->metadata = decoder_data->metadata;
+		md_buf_add(decoder_data->chunk);
+		decoder_data->chunk = NULL;
 	}
 
 	return;

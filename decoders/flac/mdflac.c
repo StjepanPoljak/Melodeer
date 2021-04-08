@@ -32,10 +32,7 @@ void md_flac_metadata_cb(const FLAC__StreamDecoder* decoder,
 		goto fail_metadata;
 	}
 
-	if (md_set_metadata(meta)) {
-		md_error("Could not set metadata.");
-		goto fail_metadata;
-	}
+	md_set_metadata((md_decoder_data_t*)client_data, meta);
 
 	return;
 
@@ -43,7 +40,7 @@ fail_metadata:
 	free(meta);
 
 early_fail_metadata:
-	md_decoder_done(&flac_decoder);
+	md_decoder_done((md_decoder_data_t*)client_data);
 
 	return;
 }
@@ -57,14 +54,14 @@ static void md_flac_error_cb(const FLAC__StreamDecoder* decoder,
 
 static int process_block(const FLAC__Frame* frame,
 			 const FLAC__int32* const buffer[],
-			 int i) {
+			 int i, md_decoder_data_t* decoder_data) {
 	int c, b, ret;
 
 	for (c = 0; c < frame->header.channels; c++) {
 
 		for (b = 0; b < frame->header.bits_per_sample; b += 8) {
 
-			ret = md_add_decoded_byte(&flac_decoder,
+			ret = md_add_decoded_byte(decoder_data,
 						  buffer[c][i] >> b);
 			if (ret) {
 				md_error("Error adding decoded byte.");
@@ -89,14 +86,15 @@ static FLAC__StreamDecoderWriteStatus md_flac_write_cb(
 	 * return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
 	 *
 	 */
-		if (process_block(frame, buffer, i))
+		if (process_block(frame, buffer, i,
+				 (md_decoder_data_t*)client_data))
 			return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
 	}
 
 	return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
 }
 
-int md_flac_decode_fp(FILE* file) {
+int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 	FLAC__bool ok;
 	FLAC__StreamDecoderInitStatus init_status;
 	FLAC__StreamDecoder* md_flac_decoder;
@@ -113,11 +111,11 @@ int md_flac_decode_fp(FILE* file) {
 
 	init_status = FLAC__stream_decoder_init_FILE(
 				md_flac_decoder,
-				file,
+				(FILE*)decoder_data->data,
 				md_flac_write_cb,
 				md_flac_metadata_cb,
 				md_flac_error_cb,
-				NULL
+				(void*)decoder_data
 			);
 
 	ok = init_status == FLAC__STREAM_DECODER_INIT_STATUS_OK;
@@ -137,7 +135,7 @@ int md_flac_decode_fp(FILE* file) {
 	}
 
 exit_decoder:
-	md_decoder_done(&flac_decoder);
+	md_decoder_done(decoder_data);
 
 	return 0;
 }
@@ -149,7 +147,6 @@ bool md_flac_decodes_file(const char* file) {
 
 static md_decoder_t flac_decoder = {
 	.name = "flac",
-	.chunk = NULL,
 	.ops = {
 		.decodes_file = md_flac_decodes_file,
 		.decode_file = NULL,

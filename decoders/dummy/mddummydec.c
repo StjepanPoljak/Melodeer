@@ -5,12 +5,11 @@
 #include <errno.h>
 
 #include "mdlog.h"
-#include "mdbufchunk.h"
 #include "mdutils.h"
 
 static md_decoder_t dummy_decoder;
 
-static int md_dummy_set_metadata(void) {
+static int md_dummy_set_metadata(md_decoder_data_t* decoder_data) {
 	md_metadata_t* meta;
 
 	meta = malloc(sizeof(*meta));
@@ -24,25 +23,25 @@ static int md_dummy_set_metadata(void) {
 	meta->bps = 0;
 	meta->total_samples = 0;
 
-	if (md_set_metadata(meta)) {
-		md_error("Invalid metadata.");
-		return -EINVAL;
-	}
+	md_set_metadata(decoder_data, meta);
 
 	return 0;
 }
 
-int md_dummy_decode_fp(FILE* file) {
+int md_dummy_decode_fp(md_decoder_data_t* decoder_data) {
 	uint8_t buf;
 	int ret;
+	FILE* file;
 
-	if ((ret = md_dummy_set_metadata())) {
+	file = (FILE*)(decoder_data->data);
+
+	if ((ret = md_dummy_set_metadata(decoder_data))) {
 		md_error("Could not set metadata.");
 		return ret;
 	}
 
 	while (fread(&buf, 1, 1, file), !feof(file))
-		ret = md_add_decoded_byte(&dummy_decoder, buf);
+		ret = md_add_decoded_byte(decoder_data, buf);
 		if (ret) {
 			md_error("Error adding decoded byte.");
 			return ret;
@@ -50,7 +49,7 @@ int md_dummy_decode_fp(FILE* file) {
 
 	fclose(file);
 
-	md_decoder_done(&dummy_decoder);
+	md_decoder_done(decoder_data);
 
 	return 0;
 }
@@ -62,7 +61,6 @@ bool md_dummy_decodes_file(const char* file) {
 
 static md_decoder_t dummy_decoder = {
 	.name = "dummy",
-	.chunk = NULL,
 	.ops = {
 		.decodes_file = md_dummy_decodes_file,
 		.decode_file = NULL,
