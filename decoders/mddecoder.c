@@ -80,6 +80,10 @@ int md_decoder_start(const char* fpath, const char* decoder) {
 
 	decoder_data->fpath = strdup(fpath);
 	decoder_data->force_decoder = decoder ? strdup(decoder) : NULL;
+	decoder_data->chunk = NULL;
+	decoder_data->metadata = NULL;
+	decoder_data->fdecoder = NULL;
+	decoder_data->data = NULL;
 
 	ret = 0;
 
@@ -95,9 +99,7 @@ int md_decoder_start(const char* fpath, const char* decoder) {
 
 int md_add_decoded_byte(md_decoder_data_t* decoder_data, uint8_t byte) {
 	md_buf_chunk_t* old;
-	//md_decoder_t* decoder;
 
-	//decoder = decoder_data->fdecoder;
 	old = decoder_data->chunk;
 
 	decoder_data->chunk = md_buf_chunk_append_byte(decoder_data->chunk,
@@ -108,18 +110,13 @@ int md_add_decoded_byte(md_decoder_data_t* decoder_data, uint8_t byte) {
 
 	else if (old && (decoder_data->chunk != old)) {
 
-		decoder_data->chunk->metadata = decoder_data->metadata;
-
-		return md_buf_add(old);
+		return old->metadata = decoder_data->metadata, md_buf_add(old);
 	}
 
 	return 0;
 }
 
 void md_decoder_done(md_decoder_data_t* decoder_data) {
-	//md_decoder_t* decoder;
-
-	//decoder = decoder_data->fdecoder;
 
 	if (decoder_data->chunk) {
 		decoder_data->chunk->decoder_done = true;

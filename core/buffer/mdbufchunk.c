@@ -32,6 +32,7 @@ static md_buf_chunk_t* md_buf_chunk_new(void) {
 md_buf_chunk_t* md_buf_chunk_append_byte(md_buf_chunk_t* buf_chunk,
 					 uint8_t byte) {
 	md_buf_chunk_t* curr;
+	static int i=0;
 
 	if (!buf_chunk || (buf_chunk->size >= get_settings()->buf_size)) {
 

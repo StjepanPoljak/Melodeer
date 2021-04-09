@@ -19,6 +19,7 @@ int md_driver_exec_events(md_buf_chunk_t* chunk) {
 	ret = 0;
 
 	if (chunk->metadata && (chunk->metadata != curr_metadata)) {
+
 		ret = get_driver_ops().set_metadata(chunk->metadata);
 		if (ret) {
 			md_error("Error executing set_metadata().");
