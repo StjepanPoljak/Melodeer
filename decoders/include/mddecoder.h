@@ -12,6 +12,11 @@
 
 struct md_decoder_data_t;
 
+typedef enum {
+	MD_BLOCKING_DECODER,
+	MD_ASYNC_DECODER
+} md_decoding_mode_t;
+
 typedef struct {
 	bool(*decodes_file)(const char*);
 	int(*decode_file)(const char*);
@@ -44,7 +49,7 @@ int md_decoder_ll_deinit(void);
 			md_log("Loaded decoder " #_name ".");	\
 	}
 
-int md_decoder_start(const char*, const char*);
+int md_decoder_start(const char*, const char*, md_decoding_mode_t);
 
 typedef struct md_decoder_data_t {
 	char* fpath;

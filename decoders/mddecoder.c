@@ -68,9 +68,16 @@ exit_decoder_handler:
 	return NULL;
 }
 
-int md_decoder_start(const char* fpath, const char* decoder) {
+int md_decoder_start(const char* fpath, const char* decoder,
+		     md_decoding_mode_t decoder_mode) {
 	int ret;
 	md_decoder_data_t* decoder_data;
+
+	if ((decoder_mode != MD_BLOCKING_DECODER)
+	 && (decoder_mode != MD_ASYNC_DECODER)) {
+		md_error("Invalid decoding mode: %d", decoder_mode);
+		return -EINVAL;
+	}
 
 	decoder_data = malloc(sizeof(*decoder_data));
 	if (!decoder_data) {
@@ -92,6 +99,24 @@ int md_decoder_start(const char* fpath, const char* decoder) {
 				  (void*)decoder_data))) {
 		md_error("Could not create decoder thread.");
 		return ret;
+	}
+
+	switch (decoder_mode) {
+	case MD_BLOCKING_DECODER:
+		if ((ret = pthread_join(decoder_thread, NULL))) {
+			md_error("Could not join thread.");
+			return ret;
+		}
+		break;
+	case MD_ASYNC_DECODER:
+		if ((ret = pthread_detach(decoder_thread))) {
+			md_error("Could not detach thread.");
+			return ret;
+		}
+		break;
+	default:
+		md_error("Internal bug: should never be here.");
+		return -EINVAL;
 	}
 
 	return ret;
