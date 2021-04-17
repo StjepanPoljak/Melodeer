@@ -23,6 +23,7 @@ static struct md_openal_t {
 	pthread_t thread;
 	ALenum format;
 	ALuint sample_rate;
+	bool should_be_playing;
 } md_openal;
 
 #define OPENAL_SYMBOLS(FUN)		\
@@ -44,7 +45,7 @@ static struct md_openal_t {
 	FUN(alGenBuffers);		\
 	FUN(alGetError);
 
-OPENAL_SYMBOLS(md_driver_define_fptr);
+OPENAL_SYMBOLS(md_define_fptr);
 
 #define md_openal_pop_error(fmt, ...) ({				\
 	ALCenum error = alGetError();					\
@@ -53,7 +54,7 @@ OPENAL_SYMBOLS(md_driver_define_fptr);
 })
 
 #define md_openal_load_sym(_func) \
-	md_driver_load_sym(_func, &(openal_driver), &(error))
+	md_load_sym(_func, &(openal_driver), &(error))
 
 int md_openal_load_symbols(void) {
 	int error;
@@ -139,17 +140,30 @@ int md_openal_deinit(void) {
 	return 0;
 }
 
+int md_openal_play(void) {
+	int ret;
+
+	alSourcePlay(md_openal.source);
+	if ((ret = md_openal_pop_error("Cannot play.")))
+		return ret;
+
+	md_openal.should_be_playing = true;
+
+	return 0;
+}
+
 static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 				   int total, int get_pack_ret) {
 	md_buf_chunk_t* curr_chunk;
 	int i, ret;
 	bool is_playing;
 	ALuint buffer;
+	static bool once = false;
 
 	curr_chunk = buf_pack->first(buf_pack);
 	i = 0;
 
-	is_playing = md_openal_is_playing();
+	is_playing = md_openal.should_be_playing;//_is_playing();
 
 	while (curr_chunk) {
 
@@ -159,8 +173,20 @@ static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 			return ret;
 		}
 
-		if (is_playing)
+		if (is_playing) {
 			alSourceUnqueueBuffers(md_openal.source, 1, &buffer);
+
+			if (!md_openal_is_playing()) {
+
+				if ((ret = md_openal_play()))
+					return ret;
+
+				if (!once) {
+					once = true;
+					md_log("Buffer underrun.");
+				}
+			}
+		}
 
 		alBufferData(is_playing ? buffer : md_openal.buffers[i],
 			     md_openal.format,
@@ -179,8 +205,10 @@ static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 		curr_chunk = buf_pack->next(buf_pack);
 	}
 
-	if (!is_playing)
-		alSourcePlay(md_openal.source);
+	if (!is_playing) {
+		if ((ret = md_openal_play()))
+			return ret;
+	}
 
 	md_buf_clean_pack(buf_pack);
 
@@ -215,6 +243,8 @@ static void* md_openal_poll_handler(void* data) {
 
 int md_openal_init(void) {
 	int ret;
+
+	md_openal.should_be_playing = false;
 
 	md_openal.device = alcOpenDevice(NULL);
 	if (!md_openal.device) {
@@ -277,16 +307,12 @@ int md_openal_set_metadata(md_metadata_t* metadata) {
 	return 0;
 }
 
-int md_openal_play(void) {
-
-	alSourcePlay(md_openal.source);
-
-	return 0;
-}
-
 int md_openal_stop(void) {
 
-	alSourceStop(md_openal.source);
+	if (md_openal_is_playing())
+		alSourceStop(md_openal.source);
+
+	md_openal.should_be_playing = false;
 
 	return 0;
 }

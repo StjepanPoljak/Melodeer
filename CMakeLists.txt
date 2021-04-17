@@ -17,9 +17,7 @@ add_definitions(-DCONFIG_DEBUG -g)
 set (MD_LIBS
 	${CMAKE_THREAD_LIBS_INIT}
 	dl
-	#openal
-	FLAC
-	mpg123
+	#mpg123
 	m) # m is for math
 
 target_include_directories(melodeer PUBLIC include)

@@ -54,7 +54,7 @@ md_driver_ll* md_driver_ll_add(md_driver_t* driver) {
 
 	return new;
 }
-
+/*
 void md_driver_unload(md_driver_t* driver) {
 
 	if (driver->handle)
@@ -62,17 +62,21 @@ void md_driver_unload(md_driver_t* driver) {
 
 	return;
 }
-
+*/
+/*
 int md_driver_try_load(md_driver_t* driver) {
 
 	if (!driver->lib)
 		return 0;
 
-	if (!(driver->handle = dlopen(driver->lib, RTLD_NOW))) {
-		md_error("Could not find library %s for driver %s.",
-			 driver->lib, driver->name);
+	if (!driver->handle) {
+		driver->handle = dlopen(driver->lib, RTLD_NOW);
+		if (!driver->handle) {
+			md_error("Could not find library %s for driver %s.",
+				 driver->lib, driver->name);
 
-		return -EINVAL;
+			return -EINVAL;
+		}
 	}
 
 	if (driver->ops.load_symbols()) {
@@ -84,6 +88,9 @@ int md_driver_try_load(md_driver_t* driver) {
 
 	return 0;
 }
+*/
+
+DEFINE_SYM_FUNCTIONS(driver);
 
 md_driver_t* md_driver_ll_find(const char* name) {
 	md_driver_ll* curr;

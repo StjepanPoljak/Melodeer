@@ -61,6 +61,8 @@ bool md_dummy_decodes_file(const char* file) {
 
 static md_decoder_t dummy_decoder = {
 	.name = "dummy",
+	.lib = NULL,
+	.handle = NULL,
 	.ops = {
 		.decodes_file = md_dummy_decodes_file,
 		.decode_file = NULL,

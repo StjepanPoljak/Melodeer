@@ -1,11 +1,11 @@
 #ifndef MD_DRIVER_H
 #define MD_DRIVER_H
 
+#include <errno.h>
+
 #include "mdmetadata.h"
 #include "mdbufchunk.h"
-
-#include <dlfcn.h>
-#include <errno.h>
+#include "mdsym.h"
 
 typedef enum {
 	MD_DRIVER_PLAYING,
@@ -54,20 +54,10 @@ int md_driver_ll_deinit(void);
 			md_log("Loaded driver " #_name ".");	\
 	}
 
-#define md_driver_load_sym(_func, _driver, _error) do {		\
-	_func ##_ptr  = dlsym((_driver)->handle, #_func);	\
-	if (dlerror()) {					\
-		md_error("Error loading " #_func ".");		\
-		*(_error) = -EINVAL;				\
-	}							\
-} while (0)
-
-#define md_driver_define_fptr(_var)	\
-	typedef typeof(_var) _var ##_t;	\
-	_var ##_t* _var ##_ptr;
-
 int md_driver_exec_events(md_buf_chunk_t*);
-int md_driver_try_load(md_driver_t*);
-void md_driver_unload(md_driver_t*);
 
+DECLARE_SYM_FUNCTIONS(driver);
+/*int md_driver_try_load(md_driver_t*);
+void md_driver_unload(md_driver_t*);
+*/
 #endif

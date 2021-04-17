@@ -7,14 +7,14 @@
 
 static md_settings_t settings = {
 	.buf_size = 4096,
-	.buf_num = 4,
-	.min_buf_num = 3,
+	.buf_num = 2,
+	.min_buf_num = 1,
 	.max_buf_num = 5,
 	.driver = NULL
 };
 
 int load_settings(void) {
-	const char* driver_name = "openal";
+	const char* driver_name = "dummy";
 
 	settings.driver = md_driver_ll_find(driver_name);
 

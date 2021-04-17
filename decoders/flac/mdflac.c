@@ -9,7 +9,48 @@
 #include "mdbufchunk.h"
 #include "mdutils.h"
 
+#define FLAC_SYMBOLS(FUN)					\
+	FUN(FLAC__stream_decoder_init_FILE);			\
+	FUN(FLAC__stream_decoder_process_until_end_of_stream);	\
+	FUN(FLAC__stream_decoder_finish);			\
+	FUN(FLAC__stream_decoder_delete);			\
+	FUN(FLAC__stream_decoder_new);
+
+FLAC_SYMBOLS(md_define_fptr);
+
+#define md_flac_load_sym(_func) \
+	md_load_sym(_func, &(flac_decoder), &(error))
+
 static md_decoder_t flac_decoder;
+
+int md_flac_load_symbols(void) {
+	int error;
+
+	if (!flac_decoder.handle) {
+		md_error("OpenAL library hasn't been opened.");
+
+		return -EINVAL;
+	}
+
+	error = 0;
+
+	FLAC_SYMBOLS(md_flac_load_sym);
+
+	if (error) {
+		md_error("Could not load symbols.");
+
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+#define FLAC__stream_decoder_init_FILE FLAC__stream_decoder_init_FILE_ptr
+#define FLAC__stream_decoder_process_until_end_of_stream \
+	FLAC__stream_decoder_process_until_end_of_stream_ptr
+#define FLAC__stream_decoder_finish FLAC__stream_decoder_finish_ptr
+#define FLAC__stream_decoder_delete FLAC__stream_decoder_delete_ptr
+#define FLAC__stream_decoder_new FLAC__stream_decoder_new_ptr
 
 void md_flac_metadata_cb(const FLAC__StreamDecoder* decoder,
 			 const FLAC__StreamMetadata* metadata,
@@ -87,8 +128,10 @@ static FLAC__StreamDecoderWriteStatus md_flac_write_cb(
 	 *
 	 */
 		if (process_block(frame, buffer, i,
-				 (md_decoder_data_t*)client_data))
+				 (md_decoder_data_t*)client_data)) {
+			md_error("Error processing block.");
 			return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+		}
 	}
 
 	return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
@@ -119,7 +162,6 @@ int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 			);
 
 	ok = init_status == FLAC__STREAM_DECODER_INIT_STATUS_OK;
-
 	if (ok)
 		ok = FLAC__stream_decoder_process_until_end_of_stream(
 				md_flac_decoder
@@ -147,7 +189,10 @@ bool md_flac_decodes_file(const char* file) {
 
 static md_decoder_t flac_decoder = {
 	.name = "flac",
+	.lib = "libFLAC.so",
+	.handle = NULL,
 	.ops = {
+		.load_symbols = md_flac_load_symbols,
 		.decodes_file = md_flac_decodes_file,
 		.decode_file = NULL,
 		.decode_fp = md_flac_decode_fp,
