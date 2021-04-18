@@ -7,6 +7,8 @@
 #include "mdmetadata.h"
 #include "mdevq.h"
 
+#define MD_BUFFER_PADDING	4
+
 #define MD_DECODER_DONE_BIT	1
 #define MD_BLEND_BIT		2
 

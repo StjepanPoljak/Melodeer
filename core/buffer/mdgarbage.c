@@ -30,24 +30,13 @@ int md_garbage_init(int size) {
 
 bool md_garbage_is_full(void) {
 
-	/* [ ][L][F][ ] */
 	if (garbage.last == garbage.first - 1)
 		return true;
 
-	/* [F][ ][ ][L] */
 	if (garbage.first == 0 && garbage.last == garbage.size - 1)
 		return true;
 
 	return false;
-}
-
-static void md_garbage_free(md_buf_chunk_t* chunk) {
-	md_buf_chunk_t* temp;
-
-	temp = chunk;
-	free(temp);
-
-	return;
 }
 
 bool md_garbage_del_first(void) {
@@ -55,7 +44,7 @@ bool md_garbage_del_first(void) {
 	if (garbage.first == garbage.last)
 		return false;
 
-	md_garbage_free(garbage.chunks[garbage.first++]);
+	md_buf_chunk_free(garbage.chunks[garbage.first++]);
 
 	if (garbage.first >= garbage.size)
 		garbage.first = 0;

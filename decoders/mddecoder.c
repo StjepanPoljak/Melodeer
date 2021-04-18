@@ -131,18 +131,18 @@ int md_decoder_start(const char* fpath, const char* decoder,
 	return ret;
 }
 
-#define MD_BUFFER_PADDING 4
-
 static int md_adjust_size(md_buf_chunk_t* chunk) {
 	int i, size_remainder;
 
 	size_remainder = chunk->size % MD_BUFFER_PADDING;
 
 	if (size_remainder) {
+
 		if (get_settings()->buf_size - chunk->size < size_remainder) {
 			md_error("BUG: Inconsistent buffer size.");
 			return -EINVAL;
 		}
+
 		for (i = 0; i < MD_BUFFER_PADDING - size_remainder; i++)
 			chunk->chunk[chunk->size++] = 0;
 	}

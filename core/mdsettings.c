@@ -14,7 +14,7 @@ static md_settings_t settings = {
 };
 
 int load_settings(void) {
-	const char* driver_name = "openal";
+	const char* driver_name = "dummy";
 
 	settings.driver = md_driver_ll_find(driver_name);
 
