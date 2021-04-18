@@ -179,7 +179,7 @@ int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 exit_decoder:
 	md_decoder_done(decoder_data);
 
-	return 0;
+	return ret;
 }
 
 bool md_flac_decodes_file(const char* file) {

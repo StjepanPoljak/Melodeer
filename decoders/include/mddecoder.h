@@ -65,7 +65,7 @@ typedef struct md_decoder_data_t {
 } md_decoder_data_t;
 
 int md_add_decoded_byte(md_decoder_data_t*, uint8_t);
-void md_decoder_done(md_decoder_data_t*);
+int md_decoder_done(md_decoder_data_t*);
 
 #define md_set_metadata(_decoder_data, _metadata) do {	\
 	(_decoder_data)->metadata = (_metadata);	\

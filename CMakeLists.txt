@@ -12,7 +12,7 @@ set(Melodeer_VERSION_MINOR 0)
 add_executable(melodeer-exec)
 add_library(melodeer SHARED)
 
-add_definitions(-DCONFIG_DEBUG -g)
+add_definitions(-DCONFIG_DEBUG -g -Wunused)
 
 set (MD_LIBS
 	${CMAKE_THREAD_LIBS_INIT}

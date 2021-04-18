@@ -9,6 +9,7 @@
 #include "mdsettings.h"
 #include "mdcoreops.h"
 #include "mdgarbage.h"
+#include "mdevq.h"
 
 #define get_bufll_pack(buf_pack)					\
 	get_pack_data(buf_pack, struct md_bufll_pack_t)
@@ -150,6 +151,7 @@ md_buf_chunk_t* md_bufll_first(md_buf_pack_t* buf_pack) {
 	get_bufll_pack(buf_pack)->curr = get_bufll_pack(buf_pack)->head;
 	curr_chunk = get_bufll_pack(buf_pack)->curr->chunk;
 
+	md_evq_run_queue(curr_chunk->evq, MD_EVENT_RUN_ON_TAKE_IN);
 	md_exec_event(will_load_chunk, curr_chunk);
 
 	return curr_chunk;
@@ -167,6 +169,7 @@ md_buf_chunk_t* md_bufll_next(md_buf_pack_t* buf_pack) {
 
 	if (curr) {
 		curr_chunk = curr->chunk;
+		md_evq_run_queue(curr_chunk->evq, MD_EVENT_RUN_ON_TAKE_IN);
 		md_exec_event(will_load_chunk, curr->chunk);
 
 		return curr_chunk;
@@ -207,7 +210,7 @@ static bool md_buf_get_pack_cond(int count, md_pack_mode_t mode) {
 
 	if (mode == MD_PACK_EXACT) {
 
-		if (md_buf_last && md_buf_last->chunk->decoder_done)
+		if (md_buf_last && md_is_decoder_done(md_buf_last->chunk))
 			return false;
 
 		return (get_buf_num() < count);
@@ -265,7 +268,7 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 				ret = MD_PACK_EXACT_NO_MORE;
 			break;
 		}
-		else if (curr->chunk->decoder_done) {
+		else if (md_is_decoder_done(curr->chunk)) {
 			curr = curr->next;
 			if (*count != i)
 				ret = MD_PACK_EXACT_NO_MORE;

@@ -33,7 +33,7 @@ static int md_dummy_add_to_buffer(md_buf_pack_t* buf_pack,
 				  int total, int get_pack_ret) {
 	static int pack_cnt = 0;
 	md_buf_chunk_t* curr_chunk;
-	int i, ret;
+	int i;
 
 	curr_chunk = buf_pack->first(buf_pack);
 	i = 0;
@@ -42,14 +42,8 @@ static int md_dummy_add_to_buffer(md_buf_pack_t* buf_pack,
 
 	while (curr_chunk) {
 
-		for (int j=0; j<curr_chunk->size; j++)
+		for (int j = 0; j < curr_chunk->size; j++)
 			printf("%c", curr_chunk->chunk[j]);
-
-		ret = md_driver_exec_events(curr_chunk);
-		if (ret) {
-			md_error("Error executing events.");
-			return ret;
-		}
 
 		i++;
 		curr_chunk = buf_pack->next(buf_pack);
@@ -63,7 +57,7 @@ static int md_dummy_add_to_buffer(md_buf_pack_t* buf_pack,
 }
 
 static void* md_dummy_poll_handler(void* data) {
-	int val, i, ret;
+	int val, ret;
 	md_buf_pack_t* pack;
 
 	while (1) {
@@ -72,7 +66,7 @@ static void* md_dummy_poll_handler(void* data) {
 
 		ret = md_buf_get_pack(&pack, &val, MD_PACK_EXACT);
 		if (ret == MD_BUF_EXIT) {
-			md_log("Exiting OpenAL...");
+			md_log("Exiting dummy driver...");
 			break;
 		}
 
@@ -98,13 +92,6 @@ int md_dummy_init(void) {
 	return 0;
 }
 
-int md_dummy_set_metadata(md_metadata_t* metadata) {
-
-	md_log("Dummy driver got metadata.");
-
-	return 0;
-}
-
 int md_dummy_play(void) {
 
 	md_log("Dummy driver got play command.");
@@ -125,7 +112,6 @@ md_driver_t dummy_driver = {
 	.handle = NULL,
 	.ops = {
 		.init = md_dummy_init,
-		.set_metadata = md_dummy_set_metadata,
 		.play = md_dummy_play,
 		.stop = md_dummy_stop,
 		.pause = NULL,

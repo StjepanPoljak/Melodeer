@@ -8,6 +8,7 @@
 #include "mdlog.h"
 #include "mdbuf.h"
 #include "mdsettings.h"
+#include "mdcoreops.h"
 
 #define decoder_data(DATA) \
 	((md_decoder_data_t*)DATA)
@@ -130,40 +131,106 @@ int md_decoder_start(const char* fpath, const char* decoder,
 	return ret;
 }
 
-int md_add_decoded_byte(md_decoder_data_t* decoder_data, uint8_t byte) {
-	md_buf_chunk_t* old;
+#define MD_BUFFER_PADDING 4
 
-	old = decoder_data->chunk;
+static int md_adjust_size(md_buf_chunk_t* chunk) {
+	int i, size_remainder;
 
-	decoder_data->chunk = md_buf_chunk_append_byte(decoder_data->chunk,
-						       byte);
-	if (!decoder_data->chunk)
+	size_remainder = chunk->size % MD_BUFFER_PADDING;
 
-		return ({ md_error("Could not append byte."); }), -ENOMEM;
-
-	else if (old && (decoder_data->chunk != old)) {
-
-		return old->metadata = decoder_data->metadata, md_buf_add(old);
+	if (size_remainder) {
+		if (get_settings()->buf_size - chunk->size < size_remainder) {
+			md_error("BUG: Inconsistent buffer size.");
+			return -EINVAL;
+		}
+		for (i = 0; i < MD_BUFFER_PADDING - size_remainder; i++)
+			chunk->chunk[chunk->size++] = 0;
 	}
 
 	return 0;
 }
 
-void md_decoder_done(md_decoder_data_t* decoder_data) {
+int md_add_decoded_byte(md_decoder_data_t* decoder_data, uint8_t byte) {
+	md_buf_chunk_t* old;
+	static md_metadata_t* oldmeta = NULL;
+
+	old = decoder_data->chunk;
+
+	decoder_data->chunk = md_buf_chunk_append_byte(decoder_data->chunk,
+						       byte);
+	if (!decoder_data->chunk) {
+		md_error("Could not append byte.");
+
+		return -ENOMEM;
+	}
+	else if (old && (decoder_data->chunk != old)) {
+
+		if (oldmeta != decoder_data->metadata) {
+			md_exec_event(loaded_metadata, decoder_data->chunk,
+				      decoder_data->metadata);
+			oldmeta = decoder_data->metadata;
+		}
+
+		old->metadata = decoder_data->metadata;
+
+		if (md_adjust_size(old)) {
+			md_error("Could not adjust buffer size.");
+
+			return -EINVAL;
+		}
+
+		return md_buf_add(old);
+	}
+
+	return 0;
+}
+
+int md_exec_on_done(void* data) {
+
+	md_buf_chunk_t* chunk;
+
+	chunk = (md_buf_chunk_t*)data;
+
+	chunk->size ^= MD_DECODER_DONE_BIT;
+
+	md_exec_event(will_load_last_chunk, chunk);
+	free(chunk->metadata);
+
+	return 0;
+}
+
+int md_decoder_done(md_decoder_data_t* decoder_data) {
+	int ret;
+
+	ret = 0;
 
 	if (decoder_data->chunk) {
-		decoder_data->chunk->decoder_done = true;
 		decoder_data->chunk->metadata = decoder_data->metadata;
+
+		if ((ret = md_adjust_size(decoder_data->chunk))) {
+			md_error("Could not adjust buffer size.");
+
+			return ret;
+		}
+
+		md_set_decoder_done(decoder_data->chunk);
+
+		if ((ret = md_evq_add_event(decoder_data->chunk->evq,
+				     MD_EVENT_RUN_ON_TAKE_IN, md_exec_on_done,
+				     (void*)decoder_data->chunk))) {
+			md_error("Could not add decoder done event.");
+
+			return ret;
+		}
+
 		md_buf_add(decoder_data->chunk);
 		decoder_data->chunk = NULL;
 	}
 
-	return;
+	return ret;
 }
 
 void md_decoder_deinit(void) {
-
-	//pthread_join(decoder_thread, NULL);
 
 	return;
 }

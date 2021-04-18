@@ -11,7 +11,7 @@ int md_buf_chunk_init(void) {
 	return 0;
 }
 
-static md_buf_chunk_t* md_buf_chunk_new(void) {
+static md_buf_chunk_t* md_buf_chunk_new(int order) {
 	md_buf_chunk_t* curr;
 
 	curr = malloc(sizeof(*curr)
@@ -21,10 +21,17 @@ static md_buf_chunk_t* md_buf_chunk_new(void) {
 		return NULL;
 	}
 
-	curr->order = 0;
+	curr->evq = malloc(sizeof(*curr->evq));
+	if (!curr->evq) {
+		md_error("Could not allocate memory for event queue.");
+		return NULL;
+	}
+
+	md_evq_init(curr->evq);
+
+	curr->order = order;
 	curr->size = 0;
 	curr->metadata = NULL;
-	curr->decoder_done = false;
 
 	return curr;
 }
@@ -32,11 +39,13 @@ static md_buf_chunk_t* md_buf_chunk_new(void) {
 md_buf_chunk_t* md_buf_chunk_append_byte(md_buf_chunk_t* buf_chunk,
 					 uint8_t byte) {
 	md_buf_chunk_t* curr;
-	static int i=0;
+	int order;
+
+	order = buf_chunk ? buf_chunk->order + 1 : 0;
 
 	if (!buf_chunk || (buf_chunk->size >= get_settings()->buf_size)) {
 
-		if (!(curr = md_buf_chunk_new())) {
+		if (!(curr = md_buf_chunk_new(order))) {
 			md_error("Could not create new chunk.");
 			return NULL;
 		}
@@ -53,6 +62,8 @@ void md_buf_chunk_free(md_buf_chunk_t* buf_chunk) {
 	md_buf_chunk_t* temp;
 
 	temp = buf_chunk;
+	md_evq_deinit(temp->evq);
+	free(temp->evq);
 	free(temp);
 
 	return;

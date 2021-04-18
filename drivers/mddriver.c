@@ -9,33 +9,10 @@
 #include "mdcoreops.h"
 
 static md_driver_ll* md_driverll_head;
-static md_metadata_t* curr_metadata;
 
 #define get_driver_ops() get_settings()->driver->ops
 
-int md_driver_exec_events(md_buf_chunk_t* chunk) {
-	int ret;
-
-	ret = 0;
-
-	if (chunk->metadata && (chunk->metadata != curr_metadata)) {
-
-		ret = get_driver_ops().set_metadata(chunk->metadata);
-		if (ret) {
-			md_error("Error executing set_metadata().");
-			return ret;
-		}
-		md_exec_event(loaded_metadata, chunk, chunk->metadata);
-		curr_metadata = chunk->metadata;
-	}
-
-	if (chunk->decoder_done) {
-		md_exec_event(will_load_last_chunk, chunk);
-		free(chunk->metadata);
-	}
-
-	return ret;
-}
+DEFINE_SYM_FUNCTIONS(driver);
 
 md_driver_ll* md_driver_ll_add(md_driver_t* driver) {
 	md_driver_ll* last;
@@ -54,43 +31,6 @@ md_driver_ll* md_driver_ll_add(md_driver_t* driver) {
 
 	return new;
 }
-/*
-void md_driver_unload(md_driver_t* driver) {
-
-	if (driver->handle)
-		dlclose(driver->handle);
-
-	return;
-}
-*/
-/*
-int md_driver_try_load(md_driver_t* driver) {
-
-	if (!driver->lib)
-		return 0;
-
-	if (!driver->handle) {
-		driver->handle = dlopen(driver->lib, RTLD_NOW);
-		if (!driver->handle) {
-			md_error("Could not find library %s for driver %s.",
-				 driver->lib, driver->name);
-
-			return -EINVAL;
-		}
-	}
-
-	if (driver->ops.load_symbols()) {
-		md_error("Could not load %s symbols.", driver->name);
-		md_driver_unload(driver);
-
-		return -EINVAL;
-	}
-
-	return 0;
-}
-*/
-
-DEFINE_SYM_FUNCTIONS(driver);
 
 md_driver_t* md_driver_ll_find(const char* name) {
 	md_driver_ll* curr;

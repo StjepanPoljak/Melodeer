@@ -21,8 +21,6 @@ static struct md_openal_t {
 	ALuint* buffers;
 	ALuint source;
 	pthread_t thread;
-	ALenum format;
-	ALuint sample_rate;
 	bool should_be_playing;
 } md_openal;
 
@@ -167,12 +165,6 @@ static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 
 	while (curr_chunk) {
 
-		ret = md_driver_exec_events(curr_chunk);
-		if (ret) {
-			md_error("Error executing events.");
-			return ret;
-		}
-
 		if (is_playing) {
 			alSourceUnqueueBuffers(md_openal.source, 1, &buffer);
 
@@ -189,9 +181,9 @@ static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 		}
 
 		alBufferData(is_playing ? buffer : md_openal.buffers[i],
-			     md_openal.format,
+			     md_openal_get_format(curr_chunk->metadata),
 			     curr_chunk->chunk, curr_chunk->size,
-			     md_openal.sample_rate);
+			     (ALuint)curr_chunk->metadata->sample_rate);
 		if ((ret = md_openal_pop_error("Could not set buffer data.")))
 			return ret;
 
@@ -216,7 +208,7 @@ static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 }
 
 static void* md_openal_poll_handler(void* data) {
-	int val, i, ret;
+	int val, ret;
 	md_buf_pack_t* pack;
 
 	while (1) {
@@ -295,18 +287,6 @@ md_openal_fail:
 	return ret;
 }
 
-int md_openal_set_metadata(md_metadata_t* metadata) {
-
-	if (!(md_openal.format = md_openal_get_format(metadata))) {
-		md_error("Unsupported PCM format.");
-		return -EINVAL;
-	}
-
-	md_openal.sample_rate = (ALuint)metadata->sample_rate;
-
-	return 0;
-}
-
 int md_openal_stop(void) {
 
 	if (md_openal_is_playing())
@@ -324,7 +304,6 @@ md_driver_t openal_driver = {
 	.ops = {
 		.load_symbols = md_openal_load_symbols,
 		.init = md_openal_init,
-		.set_metadata = md_openal_set_metadata,
 		.play = md_openal_play,
 		.stop = md_openal_stop,
 		.pause = NULL,

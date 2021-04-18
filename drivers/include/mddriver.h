@@ -3,7 +3,6 @@
 
 #include <errno.h>
 
-#include "mdmetadata.h"
 #include "mdbufchunk.h"
 #include "mdsym.h"
 
@@ -18,7 +17,6 @@ typedef enum {
 typedef struct {
 	int(*load_symbols)(void);
 	int(*init)(void);
-	int(*set_metadata)(md_metadata_t*);
 	int(*play)(void);
 	int(*stop)(void);
 	int(*pause)(void);
@@ -54,10 +52,6 @@ int md_driver_ll_deinit(void);
 			md_log("Loaded driver " #_name ".");	\
 	}
 
-int md_driver_exec_events(md_buf_chunk_t*);
-
 DECLARE_SYM_FUNCTIONS(driver);
-/*int md_driver_try_load(md_driver_t*);
-void md_driver_unload(md_driver_t*);
-*/
+
 #endif
