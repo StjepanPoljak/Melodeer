@@ -2,7 +2,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <errno.h>
 
 #include "mdlog.h"
@@ -14,7 +13,6 @@
 	((md_decoder_data_t*)DATA)
 
 static md_decoder_ll* md_decoderll_head;
-static pthread_t decoder_thread;
 
 DEFINE_SYM_FUNCTIONS(decoder);
 
@@ -103,8 +101,8 @@ int md_decoder_start(const char* fpath, const char* decoder,
 
 	ret = 0;
 
-	if ((ret = pthread_create(&decoder_thread, NULL,
-				  md_decoder_handler,
+	if ((ret = pthread_create(&decoder_data->decoder_thread,
+				  NULL, md_decoder_handler,
 				  (void*)decoder_data))) {
 		md_error("Could not create decoder thread.");
 		return ret;
@@ -112,13 +110,14 @@ int md_decoder_start(const char* fpath, const char* decoder,
 
 	switch (decoder_mode) {
 	case MD_BLOCKING_DECODER:
-		if ((ret = pthread_join(decoder_thread, NULL))) {
+		if ((ret = pthread_join(decoder_data->decoder_thread,
+					NULL))) {
 			md_error("Could not join thread.");
 			return ret;
 		}
 		break;
 	case MD_ASYNC_DECODER:
-		if ((ret = pthread_detach(decoder_thread))) {
+		if ((ret = pthread_detach(decoder_data->decoder_thread))) {
 			md_error("Could not detach thread.");
 			return ret;
 		}

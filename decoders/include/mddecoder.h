@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #include "mdll.h"
 #include "mdmetadata.h"
@@ -62,6 +63,8 @@ typedef struct md_decoder_data_t {
 	md_metadata_t* metadata;
 	md_buf_chunk_t* chunk;
 	void* data;
+	pthread_t decoder_thread;
+
 } md_decoder_data_t;
 
 int md_add_decoded_byte(md_decoder_data_t*, uint8_t);
