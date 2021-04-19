@@ -4,6 +4,7 @@
 #include <errno.h>
 
 #include "mdlog.h"
+#include "mdevq.h"
 
 struct md_garbage_t {
 	md_buf_chunk_t** chunks;
@@ -56,6 +57,8 @@ bool md_garbage_del_first(void) {
 }
 
 void md_add_to_garbage(md_buf_chunk_t* chunk) {
+
+	md_evq_run_queue(chunk->evq, MD_EVENT_RUN_ON_TAKE_OUT);
 
 	if (md_garbage_is_full())
 		(void)md_garbage_del_first();

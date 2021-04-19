@@ -63,6 +63,7 @@ void md_flac_metadata_cb(const FLAC__StreamDecoder* decoder,
 		goto early_fail_metadata;
 	}
 
+	meta->fname = ((md_decoder_data_t*)client_data)->fpath;
 	meta->sample_rate = metadata->data.stream_info.sample_rate;
 	meta->channels = metadata->data.stream_info.channels;
 	meta->bps = metadata->data.stream_info.bits_per_sample;
@@ -162,6 +163,7 @@ int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 			);
 
 	ok = init_status == FLAC__STREAM_DECODER_INIT_STATUS_OK;
+
 	if (ok)
 		ok = FLAC__stream_decoder_process_until_end_of_stream(
 				md_flac_decoder

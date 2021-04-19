@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 typedef struct {
+	char*		fname;
 	int		sample_rate;
 	uint8_t		channels;
 	uint16_t	bps;

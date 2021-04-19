@@ -10,6 +10,7 @@
 #include "mdcoreops.h"
 #include "mdgarbage.h"
 #include "mdevq.h"
+#include "mddecoder.h"
 
 #define get_bufll_pack(buf_pack)					\
 	get_pack_data(buf_pack, struct md_bufll_pack_t)
@@ -206,14 +207,30 @@ void md_buf_clean_pack(md_buf_pack_t* buf_pack) {
 	return;
 }
 
+bool md_buf_is_empty(void) {
+	bool is_empty;
+
+	pthread_mutex_lock(&md_bufll.mutex);
+	is_empty = md_buf_head == NULL;
+	pthread_mutex_unlock(&md_bufll.mutex);
+
+	return is_empty;
+}
+
 static bool md_buf_get_pack_cond(int count, md_pack_mode_t mode) {
 
 	if (mode == MD_PACK_EXACT) {
 
-		if (md_buf_last && md_is_decoder_done(md_buf_last->chunk))
+		if (get_buf_num() >= count)
 			return false;
 
-		return (get_buf_num() < count);
+		else if (md_buf_last && md_is_decoder_done(md_buf_last->chunk) && md_no_more_decoders())
+			return false;
+
+		else
+			return true;
+
+		//return (get_buf_num() < count);
 	}
 
 	return !get_buf_num();
@@ -253,6 +270,7 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 		pthread_mutex_unlock(&md_bufll.mutex);
 		free(*buf_pack);
 		free(md_bufll_pack);
+
 		return ret;
 	}
 
@@ -268,11 +286,11 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 				ret = MD_PACK_EXACT_NO_MORE;
 			break;
 		}
-		else if (md_is_decoder_done(curr->chunk)) {
+		else if (md_is_decoder_done(curr->chunk) && md_no_more_decoders()) {
 			curr = curr->next;
-			if (*count != i)
-				ret = MD_PACK_EXACT_NO_MORE;
-			*count = i;
+			*count = i + 1;
+			ret = MD_BUF_NO_DECODERS;
+
 			break;
 		}
 		else if (i < *count - 1)

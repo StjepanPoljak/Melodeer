@@ -12,7 +12,9 @@ set(Melodeer_VERSION_MINOR 0)
 add_executable(melodeer-exec)
 add_library(melodeer SHARED)
 
-add_definitions(-DCONFIG_DEBUG -g -Wunused -Wunused-function)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -g -Wunused -Wunused-function")
+
+add_definitions(-DCONFIG_DEBUG)
 
 set (MD_LIBS
 	${CMAKE_THREAD_LIBS_INIT}

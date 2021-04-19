@@ -22,9 +22,23 @@ void md_loaded_metadata(md_buf_chunk_t* chunk, md_metadata_t* metadata) {
 	return;
 }
 
-void md_will_load_last_chunk(md_buf_chunk_t* chunk) {
+void md_last_chunk_take_in(md_buf_chunk_t* chunk) {
 
-	md_log("Done playing file.");
+	md_log("Done decoding file.", chunk->metadata->fname);
+
+	return;
+}
+
+void md_last_chunk_take_out(md_buf_chunk_t* chunk) {
+
+	md_log("Done playing file %s.", chunk->metadata->fname);
+
+	return;
+}
+
+void md_melodeer_stopped(void) {
+
+	md_log("Melodeer stopped.");
 
 	md_running = false;
 
@@ -34,7 +48,9 @@ void md_will_load_last_chunk(md_buf_chunk_t* chunk) {
 static md_core_ops_t md_core_ops = {
 	.will_load_chunk = NULL,
 	.loaded_metadata = md_loaded_metadata,
-	.will_load_last_chunk = md_will_load_last_chunk
+	.last_chunk_take_in = md_last_chunk_take_in,
+	.last_chunk_take_out = md_last_chunk_take_out,
+	.melodeer_stopped = md_melodeer_stopped
 };
 
 int md_init(void) {
@@ -44,11 +60,22 @@ int md_init(void) {
 		md_error("Error loading settings.");
 		return -EINVAL;
 	}
+
 	md_buf_init();
 	get_settings()->driver->ops.init();
 
+	md_decoder_init();
+
 //	md_decoder_start("/home/stjepan/Develop/Melodeer/03 - Scarified.flac", NULL, MD_ASYNC_DECODER);
-	md_decoder_start("CMakeLists.txt", "dummy", MD_ASYNC_DECODER);
+//	md_decoder_start("/home/stjepan/Develop/Melodeer/03 - Third Day Of A Seven Day Binge.flac", NULL, MD_ASYNC_DECODER);
+
+	md_decoder_start("/home/stjepan/Develop/Melodeer/04 - 4 U.flac", NULL, MD_ASYNC_DECODER);
+	md_decoder_start("/home/stjepan/Develop/Melodeer/01 - Dead.flac", NULL, MD_ASYNC_DECODER);
+
+
+//	md_decoder_start("CMakeLists.txt", "dummy", MD_ASYNC_DECODER);
+//	md_decoder_start("README.md", "dummy", MD_ASYNC_DECODER);
+
 
 	while (md_running) { }
 
@@ -79,6 +106,8 @@ void md_deinit(void) {
 
 	md_decoder_ll_deinit();
 	md_driver_ll_deinit();
+
+	md_decoder_deinit();
 
 	return;
 }

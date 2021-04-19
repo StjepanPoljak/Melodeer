@@ -83,7 +83,7 @@ int md_evq_run_queue(md_evq_t* evq, md_event_type_t type) {
 		break;
 	case MD_EVENT_RUN_ON_TAKE_OUT:
 		__ll_deinit(evq->ll_take_out, md_evq_free, curr, next);
-		evq->ll_take_in = NULL;
+		evq->ll_take_out = NULL;
 
 		break;
 	default:

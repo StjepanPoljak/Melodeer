@@ -53,8 +53,9 @@ int md_decoder_ll_deinit(void);
 			md_log("Loaded decoder " #_name ".");	\
 	}
 
-int md_decoder_try_load(md_decoder_t*);
+void md_decoder_init(void);
 int md_decoder_start(const char*, const char*, md_decoding_mode_t);
+void md_decoder_deinit(void);
 
 typedef struct md_decoder_data_t {
 	char* fpath;
@@ -64,11 +65,11 @@ typedef struct md_decoder_data_t {
 	md_buf_chunk_t* chunk;
 	void* data;
 	pthread_t decoder_thread;
-
 } md_decoder_data_t;
 
 int md_add_decoded_byte(md_decoder_data_t*, uint8_t);
 int md_decoder_done(md_decoder_data_t*);
+bool md_no_more_decoders(void);
 
 #define md_set_metadata(_decoder_data, _metadata) do {	\
 	(_decoder_data)->metadata = (_metadata);	\

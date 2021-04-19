@@ -150,8 +150,7 @@ int md_openal_play(void) {
 	return 0;
 }
 
-static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
-				   int total, int get_pack_ret) {
+static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack) {
 	md_buf_chunk_t* curr_chunk;
 	int i, ret;
 	bool is_playing;
@@ -161,10 +160,14 @@ static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 	curr_chunk = buf_pack->first(buf_pack);
 	i = 0;
 
-	is_playing = md_openal.should_be_playing;//_is_playing();
+	is_playing = md_openal.should_be_playing;
 
 	while (curr_chunk) {
-
+/* if we're debugging and the kid is asleep, turn the volume down */
+/*
+		for (int j = 0; j < curr_chunk->size; j++)
+			curr_chunk->chunk[j] = 0;
+*/
 		if (is_playing) {
 			alSourceUnqueueBuffers(md_openal.source, 1, &buffer);
 
@@ -175,7 +178,7 @@ static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 
 				if (!once) {
 					once = true;
-					md_log("Buffer underrun.");
+					md_error("Buffer underrun.");
 				}
 			}
 		}
@@ -209,9 +212,12 @@ static int md_openal_add_to_buffer(md_buf_pack_t* buf_pack,
 
 static void* md_openal_poll_handler(void* data) {
 	int val, ret;
+	bool stopped;
 	md_buf_pack_t* pack;
 
-	while (1) {
+	stopped = false;
+
+	while (!stopped) {
 
 		alGetSourcei(md_openal.source, AL_BUFFERS_PROCESSED, &val);
 
@@ -222,13 +228,30 @@ static void* md_openal_poll_handler(void* data) {
 
 		ret = md_buf_get_pack(&pack, &val, MD_PACK_EXACT);
 		if (ret == MD_BUF_EXIT) {
-			md_log("Exiting OpenAL...");
+			break;
+		}
+		else if (ret == MD_BUF_NO_DECODERS) {
+			stopped = true;
+		}
+
+		if (!val) {
+			md_error("Got zero buffers.");
 			break;
 		}
 
-		if ((ret = md_openal_add_to_buffer(pack, val, ret)))
+		if ((ret = md_openal_add_to_buffer(pack)))
 			break;
+
+		if (stopped) {
+			while (md_openal_is_playing()) { }
+
+			if (md_openal_is_playing()) {
+				md_error("BUG: md_openal_is_playing() == true");
+			}
+		}
 	}
+
+	md_log("Exiting OpenAL...");
 
 	return NULL;
 }
