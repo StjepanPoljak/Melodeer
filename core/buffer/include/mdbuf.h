@@ -26,6 +26,7 @@ typedef enum {
 
 int md_buf_init(void);
 int md_buf_add(md_buf_chunk_t*);
+md_buf_chunk_t* md_buf_get_head(void);
 int md_buf_get(md_buf_chunk_t**);
 int md_buf_get_pack(md_buf_pack_t**, int*, md_pack_mode_t);
 void md_buf_signal_error(void);

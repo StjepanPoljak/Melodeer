@@ -9,4 +9,4 @@ target_sources(melodeer-exec PRIVATE ${DRIVER_SOURCES})
 
 add_subdirectory(openal)
 add_subdirectory(dummy)
-
+add_subdirectory(pulseaudio)

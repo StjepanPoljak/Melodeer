@@ -6,7 +6,7 @@
 #include "mdlog.h"
 
 static md_settings_t settings = {
-	.buf_size = 4096,
+	.buf_size = 256,
 	.buf_num = 4,
 	.min_buf_num = 3,
 	.max_buf_num = 5,
@@ -14,7 +14,7 @@ static md_settings_t settings = {
 };
 
 int load_settings(void) {
-	const char* driver_name = "openal";
+	const char* driver_name = "pulseaudio";
 
 	settings.driver = md_driver_ll_find(driver_name);
 

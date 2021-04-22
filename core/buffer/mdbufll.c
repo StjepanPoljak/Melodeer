@@ -125,6 +125,24 @@ static void md_buf_free(struct md_buf_ll* curr) {
 	return;
 }
 
+md_buf_chunk_t* md_buf_get_head(void) {
+	md_buf_chunk_t* ret;
+
+	/* Nothing in decoder or buffer code should ever
+	 * remove head when it appears: it is up to driver
+	 * to make sure -it- does not remove head when
+	 * dealing with this pointer. */
+
+	pthread_mutex_lock(&md_bufll.mutex);
+	while (!md_buf_head) {
+		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
+	}
+	ret = md_buf_head->chunk;
+	pthread_mutex_unlock(&md_bufll.mutex);
+
+	return ret;
+}
+
 int md_buf_get(md_buf_chunk_t** buf_chunk) {
 	struct md_buf_ll* temp;
 
