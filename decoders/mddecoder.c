@@ -16,6 +16,7 @@ static md_decoder_ll* md_decoderll_head;
 static pthread_mutex_t decoder_mutex;
 static pthread_cond_t decoder_cond;
 static md_decoder_data_t* curr_decoder;
+static bool decoder_running;
 
 DEFINE_SYM_FUNCTIONS(decoder);
 
@@ -41,22 +42,50 @@ static md_decoder_t* md_decoder_ll_find(const char* name) {
 	return curr ? curr->decoder : NULL;
 }
 
-static void md_decoder_wait(md_decoder_data_t* decoder) {
+static bool md_decoder_wait(md_decoder_data_t* decoder) {
+	bool ret;
 
 	pthread_mutex_lock(&decoder_mutex);
-	while (curr_decoder)
+	while (curr_decoder && decoder_running)
 		pthread_cond_wait(&decoder_cond, &decoder_mutex);
+	if (decoder_running)
+		curr_decoder = decoder;
+	ret = decoder_running;
+	pthread_mutex_unlock(&decoder_mutex);
 
-	curr_decoder = decoder;
+	return ret;
+}
+
+void md_stop_decoder_engine(void) {
+	pthread_mutex_lock(&decoder_mutex);
+	decoder_running = false;
+	pthread_cond_signal(&decoder_cond);
 	pthread_mutex_unlock(&decoder_mutex);
 
 	return;
 }
 
+void md_start_decoder_engine(void) {
+	pthread_mutex_lock(&decoder_mutex);
+	decoder_running = true;
+	//pthread_cond_signal(&decoder_cond);
+	pthread_mutex_unlock(&decoder_mutex);
+
+	md_log("Starting decoder engine...");
+
+	return;
+}
 static void* md_decoder_handler(void* data) {
 	md_decoder_t* fdecoder;
 
-	md_decoder_wait(decoder_data(data));
+	md_log("YO");
+
+	if (!md_decoder_wait(decoder_data(data))) {
+		md_log("Decoder canceled.");
+		goto exit_decoder_handler;
+	}
+
+	md_log("HERE");
 
 	if (decoder_data(data)->force_decoder) {
 		if (!(fdecoder = md_decoder_ll_find(
@@ -84,7 +113,7 @@ static void* md_decoder_handler(void* data) {
 		md_decode_as_fp(decoder_data(data));
 
 exit_decoder_handler:
-	//free(decoder_data(data)->fpath);
+
 	if (decoder_data(data)->force_decoder)
 		free(decoder_data(data)->force_decoder);
 	free(data);
@@ -118,12 +147,16 @@ int md_decoder_start(const char* fpath, const char* decoder,
 
 	ret = 0;
 
+	md_log("Decoder thread...");
+
 	if ((ret = pthread_create(&decoder_data->decoder_thread,
 				  NULL, md_decoder_handler,
 				  (void*)decoder_data))) {
 		md_error("Could not create decoder thread.");
 		return ret;
 	}
+
+	md_log("Started thread...");
 
 	switch (decoder_mode) {
 	case MD_BLOCKING_DECODER:
@@ -211,19 +244,19 @@ int md_done_take_in(void* data) {
 }
 
 int md_done_take_out(void* data) {
-	bool md_stopped;
+	//bool md_stopped;
 
 	md_exec_event(last_chunk_take_out, (md_buf_chunk_t*)data);
 
 	free(((md_buf_chunk_t*)data)->metadata->fname);
 	free(((md_buf_chunk_t*)data)->metadata);
 
-	pthread_mutex_lock(&decoder_mutex);
-	md_stopped = md_buf_is_empty() && !curr_decoder;
-	pthread_mutex_unlock(&decoder_mutex);
-
-	if (md_stopped)
-		md_exec_event(melodeer_stopped);
+//	pthread_mutex_lock(&decoder_mutex);
+//	md_stopped = md_buf_is_empty() && !curr_decoder;
+//	pthread_mutex_unlock(&decoder_mutex);
+//
+//	if (md_stopped)
+//		md_exec_event(melodeer_stopped);
 
 	return 0;
 }
@@ -287,6 +320,7 @@ int md_decoder_done(md_decoder_data_t* decoder_data) {
 void md_decoder_init(void) {
 
 	curr_decoder = NULL;
+	decoder_running = true;
 
 	pthread_mutex_init(&decoder_mutex, NULL);
 	pthread_cond_init(&decoder_cond, NULL);

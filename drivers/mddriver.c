@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "mdlog.h"
 #include "mdll.h"
@@ -9,6 +10,7 @@
 #include "mdcoreops.h"
 
 static md_driver_ll* md_driverll_head;
+
 
 #define get_driver_ops() get_settings()->driver->ops
 
@@ -60,3 +62,7 @@ int md_driver_ll_deinit(void) {
 	return 0;
 }
 
+int md_driver_toggle_pause(void) {
+
+
+}

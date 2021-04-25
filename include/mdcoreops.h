@@ -9,6 +9,7 @@ typedef struct {
 	void(*will_load_chunk)(md_buf_chunk_t*);
 	void(*last_chunk_take_in)(md_buf_chunk_t*);
 	void(*last_chunk_take_out)(md_buf_chunk_t*);
+	void(*driver_error)(void);
 	void(*melodeer_stopped)(void);
 } md_core_ops_t;
 

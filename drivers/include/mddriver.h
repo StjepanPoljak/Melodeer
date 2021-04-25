@@ -8,10 +8,8 @@
 
 typedef enum {
 	MD_DRIVER_PLAYING,
-	MD_DRIVER_WAITING,
 	MD_DRIVER_STOPPED,
-	MD_DRIVER_PAUSED,
-	MD_DRIVER_ERROR
+	MD_DRIVER_PAUSED
 } md_driver_state_t;
 
 typedef struct {
@@ -20,6 +18,7 @@ typedef struct {
 	int(*play)(void);
 	int(*stop)(void);
 	int(*pause)(void);
+	int(*resume)(void);
 	int(*get_state)(md_driver_state_t*);
 	int(*deinit)(void);
 } md_driver_ops;

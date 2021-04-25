@@ -68,6 +68,8 @@ typedef struct md_decoder_data_t {
 } md_decoder_data_t;
 
 int md_add_decoded_byte(md_decoder_data_t*, uint8_t);
+void md_stop_decoder_engine(void);
+void md_start_decoder_engine(void);
 int md_decoder_done(md_decoder_data_t*);
 bool md_no_more_decoders(void);
 

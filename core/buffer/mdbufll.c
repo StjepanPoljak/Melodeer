@@ -133,12 +133,16 @@ md_buf_chunk_t* md_buf_get_head(void) {
 	 * to make sure -it- does not remove head when
 	 * dealing with this pointer. */
 
+	md_log("Still getting head...");
+
 	pthread_mutex_lock(&md_bufll.mutex);
-	while (!md_buf_head) {
+	while (!md_buf_head && md_bufll.run) {
 		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
 	}
-	ret = md_buf_head->chunk;
+	ret = md_buf_head ? md_buf_head->chunk : NULL;
 	pthread_mutex_unlock(&md_bufll.mutex);
+
+	md_log("Got head!");
 
 	return ret;
 }
@@ -247,12 +251,13 @@ static bool md_buf_get_pack_cond(int count, md_pack_mode_t mode) {
 
 		else
 			return true;
-
-		//return (get_buf_num() < count);
 	}
 
 	return !get_buf_num();
 }
+
+#define md_will_stop_on(bufll) \
+	(md_is_decoder_done((bufll)->chunk) && md_no_more_decoders())
 
 int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 		    md_pack_mode_t pack_mode) {
@@ -304,7 +309,7 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 				ret = MD_PACK_EXACT_NO_MORE;
 			break;
 		}
-		else if (md_is_decoder_done(curr->chunk) && md_no_more_decoders()) {
+		else if (md_will_stop_on(curr)) {
 			curr = curr->next;
 			*count = i + 1;
 			ret = MD_BUF_NO_DECODERS;
@@ -332,7 +337,7 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 	return ret;
 }
 
-int md_buf_deinit(void) {
+void md_buf_flush(void) {
 	struct md_buf_ll* curr;
 	struct md_buf_ll* next;
 
@@ -347,10 +352,29 @@ int md_buf_deinit(void) {
 		curr = next;
 	}
 
+	md_buf_head = NULL;
+	md_buf_last = NULL;
 	md_bufll.run = false;
 
 	pthread_cond_signal(&md_bufll.cond);
 	pthread_mutex_unlock(&md_bufll.mutex);
+
+	return;
+}
+
+void md_buf_resume(void) {
+	pthread_mutex_lock(&md_bufll.mutex);
+	md_bufll.run = true;
+	pthread_mutex_unlock(&md_bufll.mutex);
+
+	md_log("Resuming buffer engine.");
+
+	return;
+}
+
+int md_buf_deinit(void) {
+
+	md_buf_flush();
 
 	pthread_mutex_destroy(&md_bufll.mutex);
 	pthread_cond_destroy(&md_bufll.cond);

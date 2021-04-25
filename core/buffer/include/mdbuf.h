@@ -32,6 +32,8 @@ int md_buf_get_pack(md_buf_pack_t**, int*, md_pack_mode_t);
 void md_buf_signal_error(void);
 void md_buf_clean_pack(md_buf_pack_t*);
 bool md_buf_is_empty(void);
+void md_buf_flush(void);
+void md_buf_resume(void);
 int md_buf_deinit(void);
 
 #endif

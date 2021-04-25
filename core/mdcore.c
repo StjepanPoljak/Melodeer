@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <unistd.h>
+#include <signal.h>
 
 #include "mdlog.h"
 #include "mdsettings.h"
@@ -13,6 +15,15 @@
 #include "mdgarbage.h"
 
 static bool volatile md_running = true;
+
+static void sigint_handler(int signal) {
+	(void)signal;
+
+	md_stop_decoder_engine();
+	md_buf_flush();
+
+	return;
+}
 
 void md_loaded_metadata(md_buf_chunk_t* chunk, md_metadata_t* metadata) {
 
@@ -40,7 +51,15 @@ void md_melodeer_stopped(void) {
 
 	md_log("Melodeer stopped.");
 
-	md_running = false;
+	md_buf_resume();
+	get_settings()->driver->ops.resume();
+	md_start_decoder_engine();
+
+	md_log("Starting...");
+
+	md_decoder_start("/home/stjepan/Develop/Melodeer/04 - 4 U.flac", NULL, MD_ASYNC_DECODER);
+
+	//md_running = false;
 
 	return;
 }
@@ -54,6 +73,8 @@ static md_core_ops_t md_core_ops = {
 };
 
 int md_init(void) {
+
+	signal(SIGINT, sigint_handler);
 
 	md_set_core_ops(&md_core_ops);
 	if (load_settings()) {
@@ -69,7 +90,6 @@ int md_init(void) {
 //	md_decoder_start("/home/stjepan/Develop/Melodeer/03 - Scarified.flac", NULL, MD_ASYNC_DECODER);
 //	md_decoder_start("/home/stjepan/Develop/Melodeer/03 - Third Day Of A Seven Day Binge.flac", NULL, MD_ASYNC_DECODER);
 
-	md_decoder_start("/home/stjepan/Develop/Melodeer/04 - 4 U.flac", NULL, MD_ASYNC_DECODER);
 	md_decoder_start("/home/stjepan/Develop/Melodeer/01 - Dead.flac", NULL, MD_ASYNC_DECODER);
 
 
@@ -77,7 +97,17 @@ int md_init(void) {
 //	md_decoder_start("README.md", "dummy", MD_ASYNC_DECODER);
 
 
+//	while (md_running) { }
+//
+//	sleep(3);
+//
+//	md_running = true;
+
+//	md_decoder_start("/home/stjepan/Develop/Melodeer/04 - 4 U.flac", NULL, MD_ASYNC_DECODER);
+
 	while (md_running) { }
+
+	md_log("Deinitializing...");
 
 	md_deinit();
 

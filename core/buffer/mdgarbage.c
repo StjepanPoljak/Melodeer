@@ -71,10 +71,16 @@ void md_add_to_garbage(md_buf_chunk_t* chunk) {
 	return;
 }
 
-void md_garbage_deinit(void) {
+void md_garbage_clean(void) {
 
 	while (md_garbage_del_first()) { }
 
+	return;
+}
+
+void md_garbage_deinit(void) {
+
+	md_garbage_clean();
 	free(garbage.chunks);
 
 	return;

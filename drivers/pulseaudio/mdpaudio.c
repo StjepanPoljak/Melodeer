@@ -11,13 +11,20 @@
 #include "mdbuf.h"
 #include "mdlog.h"
 #include "mdgarbage.h"
+#include "mdcoreops.h"
+
+#define md_pa_error(CONTEXT, FMT, ...) do {		\
+	md_error(FMT, ##__VA_ARGS__);			\
+	if (CONTEXT)					\
+		md_error("Pulseaudio: %s", pa_strerror(	\
+			 pa_context_errno(CONTEXT)));	\
+	md_exec_event(driver_error);			\
+} while (0)
 
 md_driver_t paudio_driver;
+static void md_pa_new_stream(pa_context* context, void* data);
 
 #define PAUDIO_SYMBOLS(FUN)				\
-	FUN(pa_mainloop_new);				\
-	FUN(pa_mainloop_get_api);			\
-	FUN(pa_mainloop_run);				\
 	FUN(pa_context_new);				\
 	FUN(pa_context_connect);			\
 	FUN(pa_context_set_state_callback);		\
@@ -39,11 +46,22 @@ md_driver_t paudio_driver;
 	FUN(pa_stream_write);				\
 	FUN(pa_stream_get_state);			\
 	FUN(pa_stream_drain);				\
+	FUN(pa_operation_get_state);			\
 	FUN(pa_operation_unref);			\
 	FUN(pa_stream_disconnect);			\
 	FUN(pa_context_disconnect);			\
 	FUN(pa_context_drain);				\
-	FUN(pa_stream_unref);
+	FUN(pa_stream_unref);				\
+	FUN(pa_threaded_mainloop_new);			\
+	FUN(pa_threaded_mainloop_start);		\
+	FUN(pa_threaded_mainloop_stop);			\
+	FUN(pa_threaded_mainloop_get_api);		\
+	FUN(pa_threaded_mainloop_wait);			\
+	FUN(pa_threaded_mainloop_signal);		\
+	FUN(pa_threaded_mainloop_lock);			\
+	FUN(pa_threaded_mainloop_unlock);		\
+	FUN(pa_threaded_mainloop_accept);		\
+	FUN(pa_threaded_mainloop_free);
 
 PAUDIO_SYMBOLS(md_define_fptr);
 
@@ -54,7 +72,7 @@ int md_paudio_load_symbols(void) {
 	int error;
 
 	if (!paudio_driver.handle) {
-		md_error("OpenAL library hasn't been opened.");
+		md_error("Pulseaudio library hasn't been opened.");
 
 		return -EINVAL;
 	}
@@ -72,9 +90,6 @@ int md_paudio_load_symbols(void) {
 	return 0;
 }
 
-#define pa_mainloop_new pa_mainloop_new_ptr
-#define pa_mainloop_get_api pa_mainloop_get_api_ptr
-#define pa_mainloop_run pa_mainloop_run_ptr
 #define pa_context_new pa_context_new_ptr
 #define pa_context_connect pa_context_connect_ptr
 #define pa_context_set_state_callback pa_context_set_state_callback_ptr
@@ -97,14 +112,25 @@ int md_paudio_load_symbols(void) {
 #define pa_stream_write pa_stream_write_ptr
 #define pa_stream_get_state pa_stream_get_state_ptr
 #define pa_stream_drain pa_stream_drain_ptr
+#define pa_operation_get_state pa_operation_get_state_ptr
 #define pa_operation_unref pa_operation_unref_ptr
 #define pa_stream_disconnect pa_stream_disconnect_ptr
 #define pa_context_disconnect pa_context_disconnect_ptr
 #define pa_context_drain pa_context_drain_ptr
 #define pa_stream_unref pa_stream_unref_ptr
+#define pa_threaded_mainloop_new pa_threaded_mainloop_new_ptr
+#define pa_threaded_mainloop_start pa_threaded_mainloop_start_ptr
+#define pa_threaded_mainloop_stop pa_threaded_mainloop_stop_ptr
+#define pa_threaded_mainloop_get_api pa_threaded_mainloop_get_api_ptr
+#define pa_threaded_mainloop_wait pa_threaded_mainloop_wait_ptr
+#define pa_threaded_mainloop_signal pa_threaded_mainloop_signal_ptr
+#define pa_threaded_mainloop_lock pa_threaded_mainloop_lock_ptr
+#define pa_threaded_mainloop_unlock pa_threaded_mainloop_unlock_ptr
+#define pa_threaded_mainloop_accept pa_threaded_mainloop_accept_ptr
+#define pa_threaded_mainloop_free pa_threaded_mainloop_free_ptr
 
 static struct md_paudio_t {
-	pa_mainloop* mainloop;
+	pa_threaded_mainloop* mainloop;
 	pa_mainloop_api* mainloop_api;
 	pa_context* context;
 	pa_operation* operation;
@@ -112,7 +138,8 @@ static struct md_paudio_t {
 	pa_buffer_attr buffer_attr;
 	pa_stream_flags_t stream_flags;
 	pa_stream* stream;
-	pthread_t paudio_thread;
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
 } md_paudio;
 
 static void md_pa_get_sample_spec(md_metadata_t* metadata,
@@ -159,9 +186,8 @@ static int md_paudio_add_to_buffer(md_buf_pack_t* buf_pack,
 		if (pa_stream_write(stream, curr_chunk->chunk,
 				    curr_chunk->size, NULL,
 				    0, PA_SEEK_RELATIVE) < 0) {
-			md_error("Could not write to Pulseaudio: %s",
-				 pa_strerror(pa_context_errno(
-						md_paudio.context)));
+			md_pa_error(md_paudio.context,
+				    "Could not write to stream.");
 			return -EINVAL;
 		}
 
@@ -174,53 +200,39 @@ static int md_paudio_add_to_buffer(md_buf_pack_t* buf_pack,
 	return 0;
 }
 
-static void md_pa_stream_state_cb(pa_stream* stream, void* data) {
-	md_log("Stream state changed.");
+int md_paudio_deinit(void) {
 
-	switch (pa_stream_get_state(stream)) {
-	case PA_STREAM_CREATING:
-		md_log("Creating state...");
-		break;
-	case PA_STREAM_TERMINATED:
-		md_log("Terminated stream...");
-		break;
-	case PA_STREAM_READY:
-		md_log("Stream ready...");
-		break;
-	case PA_STREAM_FAILED:
-		md_error("Stream failed...");
-		break;
-	}
+	pa_context_disconnect(md_paudio.context);
+	pa_threaded_mainloop_stop(md_paudio.mainloop);
+	pa_threaded_mainloop_free(md_paudio.mainloop);
 
-	return;
+	md_log("Pulseaudio deinitialized.");
+
+	return 0;
 }
 
 static void md_context_drain_cb(pa_context* context, void* data) {
 
-	pa_context_disconnect(context);
+	md_log("Drained context.");
+
+	md_garbage_clean();
+	md_exec_event(melodeer_stopped);
+
+	if (!md_buf_get_head())
+		return;
+
+	md_pa_new_stream(context, data);
 
 	return;
 }
 
-static void md_stream_drain_cb(pa_stream* stream, int success, void* data) {
+static void md_pa_context_drain(pa_context* context) {
 	pa_operation* operation;
 
-	operation = NULL;
-
-	if (!success) {
-		md_error("Failed to drain stream: %s",
-			 pa_strerror(pa_context_errno(md_paudio.context)));
-		return;
-	}
-
-	pa_stream_disconnect(stream);
-	pa_stream_unref(stream);
-
-	stream = NULL;
-
-	operation = pa_context_drain(md_paudio.context, md_context_drain_cb,
-				     NULL);
+	operation = pa_context_drain(md_paudio.context,
+				     md_context_drain_cb, NULL);
 	if (!operation) {
+		md_pa_error(NULL, "No operation from context drain.");
 		pa_context_disconnect(md_paudio.context);
 
 		return;
@@ -231,20 +243,43 @@ static void md_stream_drain_cb(pa_stream* stream, int success, void* data) {
 	return;
 }
 
+static void md_stream_drain_cb(pa_stream* stream, int success, void* data) {
+
+	md_log("Drained stream.");
+
+	if (!success) {
+		md_pa_error(md_paudio.context, "Failed to drain stream.");
+
+		return;
+	}
+
+	pa_stream_disconnect(stream);
+	pa_stream_unref(stream);
+
+	stream = NULL;
+
+	md_pa_context_drain(md_paudio.context);
+
+	return;
+}
+
 static void md_pa_drain(pa_stream* stream) {
 	pa_operation* operation;
 
 	operation = NULL;
 
-	if (!stream)
+	if (!stream) {
+		md_log("No stream.");
+		md_pa_context_drain(md_paudio.context);
 		return;
+	}
 
 	pa_stream_set_write_callback(stream, NULL, NULL);
-
 	operation = pa_stream_drain(stream, md_stream_drain_cb, NULL);
 	if (!operation) {
-		md_error("Failed to drain stream: %s",
-			 pa_strerror(pa_context_errno(md_paudio.context)));
+		md_pa_error(md_paudio.context,
+			    "No operation from stream drain.");
+
 		return;
 	}
 
@@ -264,16 +299,34 @@ static void md_pa_stream_write_cb(pa_stream* stream,
 	buf_num = (int)buf_size / get_settings()->buf_size;
 
 	ret = md_buf_get_pack(&pack, &buf_num, MD_PACK_EXACT);
-	switch (ret) {
-	case MD_BUF_EXIT:
-	case MD_BUF_NO_DECODERS:
+	if (!ret || (ret == MD_BUF_NO_DECODERS))
+		md_paudio_add_to_buffer(pack, stream);
+
+	if ((ret == MD_BUF_EXIT) || (ret == MD_BUF_NO_DECODERS))
 		md_pa_drain(stream);
-		return;
+
+	return;
+}
+
+static void md_pa_stream_state_cb(pa_stream* stream, void* data) {
+
+	switch (pa_stream_get_state(stream)) {
+	case PA_STREAM_CREATING:
+		md_log("Creating stream...");
+		break;
+	case PA_STREAM_TERMINATED:
+		md_log("Terminated stream...");
+		break;
+	case PA_STREAM_READY:
+		md_log("Stream ready...");
+		break;
+	case PA_STREAM_FAILED:
+		md_pa_error(NULL, "Stream failed...");
+		break;
 	default:
+		md_log("Stream state changed.");
 		break;
 	}
-
-	md_paudio_add_to_buffer(pack, stream);
 
 	return;
 }
@@ -299,7 +352,7 @@ static void md_pa_stream_overflow_cb(pa_stream* stream, void* data) {
 }
 
 static void md_pa_stream_started_cb(pa_stream* stream, void* data) {
-//	md_log("Stream started.");
+	md_log("Stream started.");
 	return;
 }
 
@@ -321,18 +374,20 @@ static void md_pa_stream_success_cb(pa_stream* stream, int success,
 }
 
 static void md_pa_new_stream(pa_context* context, void* data) {
+	md_buf_chunk_t* head;
 
-	md_pa_get_sample_spec(md_buf_get_head()->metadata,
-			      &md_paudio.sample_spec);
+	head = md_buf_get_head();
+	if (!head)
+		return;
 
-	md_log("New stream.");
+	md_pa_get_sample_spec(head->metadata, &md_paudio.sample_spec);
 
-	md_paudio.stream = pa_stream_new(context, "Melodeer",
+	md_paudio.stream = pa_stream_new(context, "Playback Stream",
 					 &md_paudio.sample_spec,
 					 NULL);
 	if (!md_paudio.stream) {
-		md_error("Failed to create stream: %s.",
-			 pa_strerror(pa_context_errno(context)));
+		md_pa_error(context, "Failed to create stream.");
+
 		return;
 	}
 
@@ -355,14 +410,11 @@ static void md_pa_new_stream(pa_context* context, void* data) {
 	pa_stream_set_buffer_attr_callback(md_paudio.stream,
 					   md_pa_stream_buffer_attr_cb, NULL);
 
-	md_log("Connecting...");
-
 	if (pa_stream_connect_playback(md_paudio.stream, NULL,
 				       &md_paudio.buffer_attr,
 				       md_paudio.stream_flags,
 				       NULL, NULL) < 0) {
-		md_error("Failed to connect playback: %s",
-			 pa_strerror(pa_context_errno(context)));
+		md_pa_error(context, "Failed to connect playback.");
 		return;
 	}
 	else {
@@ -373,7 +425,32 @@ static void md_pa_new_stream(pa_context* context, void* data) {
 	return;
 }
 
-void md_pa_set_state_cb(pa_context* context, void* data) {
+static void md_pa_set_state_cb(pa_context* context, void* data);
+
+static void md_pa_setup_context(void) {
+
+	md_log("Setting up context...");
+
+	pa_context_connect(md_paudio.context, NULL, 0, NULL);
+
+	pa_context_set_state_callback(md_paudio.context,
+				      md_pa_set_state_cb, NULL);
+
+	return;
+}
+int md_paudio_resume(void) {
+
+	md_log("Resuming...");
+
+	md_pa_setup_context();
+
+	//md_pa_new_stream(md_paudio.context, NULL);
+
+	return 0;
+}
+
+
+static void md_pa_set_state_cb(pa_context* context, void* data) {
 	pa_context_state_t state;
 
 	md_log("State changed.");
@@ -381,12 +458,18 @@ void md_pa_set_state_cb(pa_context* context, void* data) {
 	state = pa_context_get_state(context);
 
 	switch (state) {
+	case PA_CONTEXT_UNCONNECTED:
+	case PA_CONTEXT_CONNECTING:
+	case PA_CONTEXT_AUTHORIZING:
+	case PA_CONTEXT_SETTING_NAME:
+		break;
+	case PA_CONTEXT_FAILED:
 	case PA_CONTEXT_TERMINATED:
-		md_error("Terminated context.");
+		md_log("Terminated context.");
 		break;
 
 	case PA_CONTEXT_READY:
-		md_log("READY");
+		md_log("Context ready!");
 		md_pa_new_stream(context, data);
 		break;
 	}
@@ -394,52 +477,32 @@ void md_pa_set_state_cb(pa_context* context, void* data) {
 	return;
 }
 
-int md_paudio_deinit(void) {
-
-	md_log("Pulseaudio deinitialized.");
-
-	pthread_join(md_paudio.paudio_thread, NULL);
-
-	return 0;
-}
-
-static void* md_paudio_mainloop_handler(void* data) {
-	int ret;
-
-	if (pa_mainloop_run(md_paudio.mainloop, &ret) < 0) {
-		md_error("Could not run main loop.");
-		pthread_exit(NULL);
-	}
-
-	return NULL;
-}
-
 int md_paudio_init(void) {
+	int buf_size, buf_num;
 
-	md_paudio.mainloop = pa_mainloop_new();
-	md_paudio.mainloop_api = pa_mainloop_get_api(md_paudio.mainloop);
-	md_paudio.context = pa_context_new(md_paudio.mainloop_api, "melodeer");
+	buf_size = get_settings()->buf_size;
+	buf_num = get_settings()->buf_num;
+
+	md_paudio.mainloop = pa_threaded_mainloop_new();
+	md_paudio.mainloop_api = pa_threaded_mainloop_get_api(
+					md_paudio.mainloop);
+	md_paudio.context = pa_context_new(md_paudio.mainloop_api,
+					   "Melodeer");
 
 	memset(&md_paudio.buffer_attr, 0, sizeof(md_paudio.buffer_attr));
 	md_paudio.buffer_attr.maxlength = (uint32_t)-1;
-	md_paudio.buffer_attr.prebuf = (uint32_t)get_settings()->buf_size
-				     * get_settings()->buf_num;
-	md_paudio.buffer_attr.minreq = (uint32_t)get_settings()->buf_size;
+	md_paudio.buffer_attr.prebuf = (uint32_t)buf_size * buf_num;
+	md_paudio.buffer_attr.minreq = (uint32_t)buf_size;
 
-	pa_context_connect(md_paudio.context, NULL, 0, NULL);
+	md_pa_setup_context();
 
-	pa_context_set_state_callback(md_paudio.context,
-				      md_pa_set_state_cb, NULL);
-
-	if (pthread_create(&md_paudio.paudio_thread, NULL,
-			   md_paudio_mainloop_handler, NULL)) {
-		md_error("Could not create main loop thread.");
+	if (pa_threaded_mainloop_start(md_paudio.mainloop) < 0) {
+		md_pa_error(NULL, "Could not run main loop.");
 
 		return -EINVAL;
 	}
 
-
-	md_log("Initialized paudio driver.");
+	md_log("Initialized Pulseaudio driver.");
 
 	return 0;
 }
@@ -453,7 +516,7 @@ int md_paudio_play(void) {
 
 int md_paudio_stop(void) {
 
-	md_log("Dummy driver got stop command.");
+//	md_log("Dummy driver got stop command.");
 
 	return 0;
 }
@@ -466,6 +529,7 @@ md_driver_t paudio_driver = {
 		.load_symbols = md_paudio_load_symbols,
 		.init = md_paudio_init,
 		.play = md_paudio_play,
+		.resume = md_paudio_resume,
 		.stop = md_paudio_stop,
 		.pause = NULL,
 		.get_state = NULL,
