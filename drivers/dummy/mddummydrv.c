@@ -92,16 +92,16 @@ int md_dummy_init(void) {
 	return 0;
 }
 
-int md_dummy_play(void) {
+md_driver_state_ret_t md_dummy_stop(void) {
 
-	md_log("Dummy driver got play command.");
+	md_log("Dummy driver got stop command.");
 
 	return 0;
 }
 
-int md_dummy_stop(void) {
+md_driver_state_ret_t md_dummy_resume(void) {
 
-	md_log("Dummy driver got stop command.");
+	md_log("Dummy driver got resume command.");
 
 	return 0;
 }
@@ -112,10 +112,10 @@ md_driver_t dummy_driver = {
 	.handle = NULL,
 	.ops = {
 		.init = md_dummy_init,
-		.play = md_dummy_play,
 		.stop = md_dummy_stop,
+		.resume = md_dummy_resume,
 		.pause = NULL,
-		.get_state = NULL,
+		.resume = NULL,
 		.deinit = md_dummy_deinit
 	}
 };

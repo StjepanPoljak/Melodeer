@@ -6,10 +6,9 @@
 #include "mdlog.h"
 
 static md_settings_t settings = {
-	.buf_size = 256,
+	.buf_size = 512,
 	.buf_num = 4,
-	.min_buf_num = 3,
-	.max_buf_num = 5,
+	.max_buf_num = 16,
 	.driver = NULL
 };
 

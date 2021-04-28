@@ -8,11 +8,33 @@
 #include "mdll.h"
 #include "mdsettings.h"
 #include "mdcoreops.h"
+#include "mdgarbage.h"
 
 static md_driver_ll* md_driverll_head;
 
+#define md_driver_set_state(COND_SAME, OPERATION,		\
+			    TARGET_STATE) ({			\
+	md_driver_state_ret_t ret;				\
+	pthread_mutex_lock(&md_driver.mutex);			\
+	if (COND_SAME)						\
+		ret = MD_DRIVER_STATE_SAME;			\
+	else if (md_driver.state != TARGET_STATE)		\
+		ret = MD_DRIVER_STATE_NOT_SET;			\
+	else {							\
+		ret = OPERATION();				\
+		if (ret == MD_DRIVER_STATE_SET)			\
+			md_driver.state = TARGET_STATE;		\
+	}							\
+	pthread_mutex_unlock(&md_driver.mutex), ret;		\
+})
 
-#define get_driver_ops() get_settings()->driver->ops
+
+static struct md_driver_data_t {
+	pthread_mutex_t mutex;
+	md_driver_state_t state;
+} md_driver;
+
+#define curr_driver_ops() get_settings()->driver->ops
 
 DEFINE_SYM_FUNCTIONS(driver);
 
@@ -62,7 +84,99 @@ int md_driver_ll_deinit(void) {
 	return 0;
 }
 
-int md_driver_toggle_pause(void) {
+int md_driver_init(void) {
 
+	pthread_mutex_init(&md_driver.mutex, NULL);
 
+	md_driver.state = MD_DRIVER_STOPPED;
+
+	return curr_driver_ops().init();
+}
+
+void md_driver_signal_state(md_driver_state_t state) {
+
+	pthread_mutex_lock(&md_driver.mutex);
+	md_driver.state = state;
+	pthread_mutex_unlock(&md_driver.mutex);
+
+	switch (state) {
+	case MD_DRIVER_STOPPED:
+		md_garbage_clean();
+		md_exec_event(stopped);
+		break;
+
+	case MD_DRIVER_PLAYING:
+		md_exec_event(playing);
+		break;
+
+	case MD_DRIVER_PAUSED:
+		md_exec_event(paused);
+		break;
+
+	default:
+		break;
+	}
+
+	return;
+}
+
+md_driver_state_ret_t md_driver_pause(void) {
+	md_driver_state_ret_t ret;
+
+	ret = md_driver_set_state(md_driver.state == MD_DRIVER_PLAYING,
+				  curr_driver_ops().pause,
+				  MD_DRIVER_PAUSED);
+
+	if (ret == MD_DRIVER_STATE_SET)
+		md_exec_event(paused);
+
+	return ret;
+}
+
+md_driver_state_ret_t md_driver_unpause(void) {
+	md_driver_state_ret_t ret;
+
+	ret = md_driver_set_state(md_driver.state == MD_DRIVER_PAUSED,
+				  curr_driver_ops().unpause,
+				  MD_DRIVER_PLAYING);
+
+	if (ret == MD_DRIVER_STATE_SET)
+		md_exec_event(playing);
+
+	return ret;
+}
+
+md_driver_state_ret_t md_driver_stop(void) {
+	md_driver_state_ret_t ret;
+
+	ret = md_driver_set_state(md_driver.state == MD_DRIVER_PLAYING ||
+				  md_driver.state == MD_DRIVER_PAUSED,
+				  curr_driver_ops().stop,
+				  MD_DRIVER_PLAYING);
+
+	if (ret == MD_DRIVER_STATE_SET)
+		md_garbage_clean(),
+		md_exec_event(stopped);
+
+	return ret;
+}
+
+md_driver_state_ret_t md_driver_resume(void) {
+	md_driver_state_ret_t ret;
+
+	ret = md_driver_set_state(md_driver.state == MD_DRIVER_STOPPED,
+				  curr_driver_ops().resume,
+				  MD_DRIVER_PLAYING);
+
+	if (ret == MD_DRIVER_STATE_SET)
+		md_exec_event(playing);
+
+	return ret;
+}
+
+void md_driver_error_event(void) {
+
+	md_exec_event(driver_error);
+
+	return;
 }

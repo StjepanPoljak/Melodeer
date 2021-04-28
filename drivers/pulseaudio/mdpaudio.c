@@ -3,22 +3,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <errno.h>
-#include <string.h>	// memset
+#include <string.h>		/* memset */
 #include <pulse/pulseaudio.h>
 #include <pthread.h>
 
 #include "mdmetadata.h"
 #include "mdbuf.h"
 #include "mdlog.h"
-#include "mdgarbage.h"
-#include "mdcoreops.h"
 
 #define md_pa_error(CONTEXT, FMT, ...) do {		\
 	md_error(FMT, ##__VA_ARGS__);			\
 	if (CONTEXT)					\
 		md_error("Pulseaudio: %s", pa_strerror(	\
 			 pa_context_errno(CONTEXT)));	\
-	md_exec_event(driver_error);			\
+	md_driver_error_event();			\
 } while (0)
 
 md_driver_t paudio_driver;
@@ -46,6 +44,7 @@ static void md_pa_new_stream(pa_context* context, void* data);
 	FUN(pa_stream_write);				\
 	FUN(pa_stream_get_state);			\
 	FUN(pa_stream_drain);				\
+	FUN(pa_stream_cork);				\
 	FUN(pa_operation_get_state);			\
 	FUN(pa_operation_unref);			\
 	FUN(pa_stream_disconnect);			\
@@ -112,6 +111,7 @@ int md_paudio_load_symbols(void) {
 #define pa_stream_write pa_stream_write_ptr
 #define pa_stream_get_state pa_stream_get_state_ptr
 #define pa_stream_drain pa_stream_drain_ptr
+#define pa_stream_cork pa_stream_cork_ptr
 #define pa_operation_get_state pa_operation_get_state_ptr
 #define pa_operation_unref pa_operation_unref_ptr
 #define pa_stream_disconnect pa_stream_disconnect_ptr
@@ -129,6 +129,12 @@ int md_paudio_load_symbols(void) {
 #define pa_threaded_mainloop_accept pa_threaded_mainloop_accept_ptr
 #define pa_threaded_mainloop_free pa_threaded_mainloop_free_ptr
 
+typedef enum {
+	MD_PA_STOPPED,
+	MD_PA_PLAYING,
+	MD_PA_EXIT
+} md_pa_state_t;
+
 static struct md_paudio_t {
 	pa_threaded_mainloop* mainloop;
 	pa_mainloop_api* mainloop_api;
@@ -140,7 +146,47 @@ static struct md_paudio_t {
 	pa_stream* stream;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
+	md_pa_state_t state;
 } md_paudio;
+
+static bool md_pa_suspend(void) {
+
+	pthread_mutex_lock(&md_paudio.mutex);
+	if (md_paudio.state == MD_PA_EXIT) {
+		pthread_mutex_unlock(&md_paudio.mutex);
+		return false;
+	}
+	md_paudio.state = MD_PA_STOPPED;
+	while (md_paudio.state == MD_PA_STOPPED)
+		pthread_cond_wait(&md_paudio.cond, &md_paudio.mutex);
+	pthread_mutex_unlock(&md_paudio.mutex);
+
+	return true;
+}
+
+static void md_pa_resume(void) {
+
+	pthread_mutex_lock(&md_paudio.mutex);
+	if (md_paudio.state == MD_PA_EXIT) {
+		pthread_mutex_unlock(&md_paudio.mutex);
+		return;
+	}
+	md_paudio.state = MD_PA_PLAYING;
+	pthread_cond_signal(&md_paudio.cond);
+	pthread_mutex_unlock(&md_paudio.mutex);
+
+	return;
+}
+
+static void md_pa_exit(void) {
+
+	pthread_mutex_lock(&md_paudio.mutex);
+	md_paudio.state = MD_PA_EXIT;
+	pthread_cond_signal(&md_paudio.cond);
+	pthread_mutex_unlock(&md_paudio.mutex);
+
+	return;
+}
 
 static void md_pa_get_sample_spec(md_metadata_t* metadata,
 				  pa_sample_spec* sample_spec) {
@@ -179,10 +225,10 @@ static int md_paudio_add_to_buffer(md_buf_pack_t* buf_pack,
 	while (curr_chunk) {
 
 /* if we're debugging and the kid is asleep, turn the volume down */
-/*
+
 		for (int j = 0; j < curr_chunk->size; j++)
 			curr_chunk->chunk[j] = 0;
-*/
+
 		if (pa_stream_write(stream, curr_chunk->chunk,
 				    curr_chunk->size, NULL,
 				    0, PA_SEEK_RELATIVE) < 0) {
@@ -202,9 +248,18 @@ static int md_paudio_add_to_buffer(md_buf_pack_t* buf_pack,
 
 int md_paudio_deinit(void) {
 
-	pa_context_disconnect(md_paudio.context);
+	md_pa_exit();
+
+	pa_threaded_mainloop_lock(md_paudio.mainloop);
+	while (md_paudio.context)
+		pa_threaded_mainloop_wait(md_paudio.mainloop);
+	pa_threaded_mainloop_unlock(md_paudio.mainloop);
+
+	md_log("Context disconnected properly.");
+
 	pa_threaded_mainloop_stop(md_paudio.mainloop);
 	pa_threaded_mainloop_free(md_paudio.mainloop);
+
 
 	md_log("Pulseaudio deinitialized.");
 
@@ -215,11 +270,14 @@ static void md_context_drain_cb(pa_context* context, void* data) {
 
 	md_log("Drained context.");
 
-	md_garbage_clean();
-	md_exec_event(melodeer_stopped);
+	md_driver_signal_state(MD_DRIVER_STOPPED);
 
-	if (!md_buf_get_head())
-		return;
+	while (!md_buf_get_head()) {
+		if (!md_pa_suspend()) {
+			pa_context_disconnect(context);
+			return;
+		}
+	}
 
 	md_pa_new_stream(context, data);
 
@@ -266,8 +324,6 @@ static void md_stream_drain_cb(pa_stream* stream, int success, void* data) {
 static void md_pa_drain(pa_stream* stream) {
 	pa_operation* operation;
 
-	operation = NULL;
-
 	if (!stream) {
 		md_log("No stream.");
 		md_pa_context_drain(md_paudio.context);
@@ -275,6 +331,7 @@ static void md_pa_drain(pa_stream* stream) {
 	}
 
 	pa_stream_set_write_callback(stream, NULL, NULL);
+
 	operation = pa_stream_drain(stream, md_stream_drain_cb, NULL);
 	if (!operation) {
 		md_pa_error(md_paudio.context,
@@ -352,7 +409,9 @@ static void md_pa_stream_overflow_cb(pa_stream* stream, void* data) {
 }
 
 static void md_pa_stream_started_cb(pa_stream* stream, void* data) {
-	md_log("Stream started.");
+
+	md_driver_signal_state(MD_DRIVER_PLAYING);
+
 	return;
 }
 
@@ -376,9 +435,15 @@ static void md_pa_stream_success_cb(pa_stream* stream, int success,
 static void md_pa_new_stream(pa_context* context, void* data) {
 	md_buf_chunk_t* head;
 
-	head = md_buf_get_head();
-	if (!head)
-		return;
+	do {
+		head = md_buf_get_head();
+		if (!head) {
+			if (!md_pa_suspend()) {
+				pa_context_disconnect(context);
+				return;
+			}
+		}
+	} while (!head);
 
 	md_pa_get_sample_spec(head->metadata, &md_paudio.sample_spec);
 
@@ -438,22 +503,9 @@ static void md_pa_setup_context(void) {
 
 	return;
 }
-int md_paudio_resume(void) {
-
-	md_log("Resuming...");
-
-	md_pa_setup_context();
-
-	//md_pa_new_stream(md_paudio.context, NULL);
-
-	return 0;
-}
-
 
 static void md_pa_set_state_cb(pa_context* context, void* data) {
 	pa_context_state_t state;
-
-	md_log("State changed.");
 
 	state = pa_context_get_state(context);
 
@@ -466,6 +518,8 @@ static void md_pa_set_state_cb(pa_context* context, void* data) {
 	case PA_CONTEXT_FAILED:
 	case PA_CONTEXT_TERMINATED:
 		md_log("Terminated context.");
+		md_paudio.context = NULL;
+		pa_threaded_mainloop_signal(md_paudio.mainloop, 0);
 		break;
 
 	case PA_CONTEXT_READY:
@@ -496,6 +550,10 @@ int md_paudio_init(void) {
 
 	md_pa_setup_context();
 
+	pthread_mutex_init(&md_paudio.mutex, NULL);
+	pthread_cond_init(&md_paudio.cond, NULL);
+	md_paudio.state = MD_PA_PLAYING;
+
 	if (pa_threaded_mainloop_start(md_paudio.mainloop) < 0) {
 		md_pa_error(NULL, "Could not run main loop.");
 
@@ -507,18 +565,73 @@ int md_paudio_init(void) {
 	return 0;
 }
 
-int md_paudio_play(void) {
+md_driver_state_ret_t md_paudio_stop(void) {
 
-	md_log("Dummy driver got play command.");
+	/* As soon as packages from buffer are
+	 * drained, Pulseaudio will stop and
+	 * inform generic driver layer through
+	 * callback of change state. */
 
-	return 0;
+	return MD_DRIVER_STATE_WILL_BE_SET;
 }
 
-int md_paudio_stop(void) {
+md_driver_state_ret_t md_paudio_resume(void) {
 
-//	md_log("Dummy driver got stop command.");
+	/* The driver will start receiving packages
+	 * when they arrive, so no need to set state
+	 * later (or do anything special). */
 
-	return 0;
+	md_pa_resume();
+
+	return MD_DRIVER_STATE_WILL_BE_SET;
+}
+
+typedef void(*cork_cb)(pa_stream*, int, void*);
+
+static md_driver_state_ret_t md_paudio_cork(int state, cork_cb cb) {
+	pa_operation* op;
+
+	pa_threaded_mainloop_lock(md_paudio.mainloop);
+	op = pa_stream_cork(md_paudio.stream, 0, cb, NULL);
+	while (pa_operation_get_state(op) != PA_OPERATION_DONE)
+		pa_threaded_mainloop_wait(md_paudio.mainloop);
+	pa_threaded_mainloop_unlock(md_paudio.mainloop);
+
+	pa_operation_unref(op);
+
+	return MD_DRIVER_STATE_WILL_BE_SET;
+}
+
+static void md_paudio_pause_success_cb(pa_stream* stream,
+				       int success, void* data) {
+
+	if (success)
+		md_driver_signal_state(MD_DRIVER_PAUSED);
+	else
+		md_pa_error(NULL, "Could not pause stream.");
+
+	return;
+}
+
+md_driver_state_ret_t md_paudio_pause(void) {
+
+	return md_paudio_cork(0, md_paudio_pause_success_cb);
+}
+
+static void md_paudio_unpause_success_cb(pa_stream* stream,
+					 int success, void* data) {
+
+	if (success)
+		md_driver_signal_state(MD_DRIVER_PLAYING);
+	else
+		md_pa_error(NULL, "Could not unpause stream.");
+
+	return;
+}
+
+md_driver_state_ret_t md_paudio_unpause(void) {
+
+	return md_paudio_cork(1, md_paudio_unpause_success_cb);
 }
 
 md_driver_t paudio_driver = {
@@ -528,11 +641,10 @@ md_driver_t paudio_driver = {
 	.ops = {
 		.load_symbols = md_paudio_load_symbols,
 		.init = md_paudio_init,
-		.play = md_paudio_play,
 		.resume = md_paudio_resume,
 		.stop = md_paudio_stop,
-		.pause = NULL,
-		.get_state = NULL,
+		.pause = md_paudio_pause,
+		.unpause = md_paudio_unpause,
 		.deinit = md_paudio_deinit
 	}
 };

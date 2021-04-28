@@ -50,18 +50,21 @@ void md_last_chunk_take_out(md_buf_chunk_t* chunk) {
 void md_melodeer_stopped(void) {
 
 	md_log("Melodeer stopped.");
-
-	md_buf_resume();
-	get_settings()->driver->ops.resume();
-	md_start_decoder_engine();
-
-	md_log("Starting...");
-
-	md_decoder_start("/home/stjepan/Develop/Melodeer/04 - 4 U.flac", NULL, MD_ASYNC_DECODER);
-
-	//md_running = false;
+	
+	md_running = false;
 
 	return;
+}
+
+void md_melodeer_playing(void) {
+
+	md_log("Melodeer playing");
+
+	return;
+}
+
+void md_melodeer_paused(void) {
+
 }
 
 static md_core_ops_t md_core_ops = {
@@ -69,7 +72,9 @@ static md_core_ops_t md_core_ops = {
 	.loaded_metadata = md_loaded_metadata,
 	.last_chunk_take_in = md_last_chunk_take_in,
 	.last_chunk_take_out = md_last_chunk_take_out,
-	.melodeer_stopped = md_melodeer_stopped
+	.stopped = md_melodeer_stopped,
+	.playing = md_melodeer_playing,
+	.paused = md_melodeer_paused
 };
 
 int md_init(void) {
@@ -83,7 +88,8 @@ int md_init(void) {
 	}
 
 	md_buf_init();
-	get_settings()->driver->ops.init();
+	md_driver_init();
+	//get_settings()->driver->ops.init();
 
 	md_decoder_init();
 
@@ -105,7 +111,25 @@ int md_init(void) {
 
 //	md_decoder_start("/home/stjepan/Develop/Melodeer/04 - 4 U.flac", NULL, MD_ASYNC_DECODER);
 
-	while (md_running) { }
+	while (md_running) {
+		sleep(5);
+	}
+
+	sleep(5);
+
+	md_buf_resume();
+	get_settings()->driver->ops.resume();
+	md_start_decoder_engine();
+
+	md_log("Starting...");
+
+	md_decoder_start("/home/stjepan/Develop/Melodeer/04 - 4 U.flac", NULL, MD_ASYNC_DECODER);
+
+	md_running = true;
+
+	while (md_running) {
+		sleep(5);
+	}
 
 	md_log("Deinitializing...");
 

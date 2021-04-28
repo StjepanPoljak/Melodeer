@@ -9,8 +9,10 @@ typedef struct {
 	void(*will_load_chunk)(md_buf_chunk_t*);
 	void(*last_chunk_take_in)(md_buf_chunk_t*);
 	void(*last_chunk_take_out)(md_buf_chunk_t*);
+	void(*stopped)(void);
+	void(*paused)(void);
+	void(*playing)(void);
 	void(*driver_error)(void);
-	void(*melodeer_stopped)(void);
 } md_core_ops_t;
 
 void md_set_core_ops(md_core_ops_t*);

@@ -146,8 +146,6 @@ int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 	ret = 0;
 	ok = true;
 
-	md_log("Getting FLAC.");
-
 	if (!(md_flac_decoder = FLAC__stream_decoder_new())) {
 		md_error("Could not create FLAC decoder.");
 		ret = -EINVAL;
@@ -164,8 +162,6 @@ int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 			);
 
 	ok = init_status == FLAC__STREAM_DECODER_INIT_STATUS_OK;
-
-	md_log("Got FLAC.");
 
 	if (ok)
 		ok = FLAC__stream_decoder_process_until_end_of_stream(

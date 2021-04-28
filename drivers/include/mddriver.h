@@ -1,6 +1,7 @@
 #ifndef MD_DRIVER_H
 #define MD_DRIVER_H
 
+#include <stdbool.h>
 #include <errno.h>
 
 #include "mdbufchunk.h"
@@ -12,13 +13,20 @@ typedef enum {
 	MD_DRIVER_PAUSED
 } md_driver_state_t;
 
+typedef enum {
+	MD_DRIVER_STATE_SET,
+	MD_DRIVER_STATE_WILL_BE_SET,
+	MD_DRIVER_STATE_SAME,
+	MD_DRIVER_STATE_NOT_SET
+} md_driver_state_ret_t;
+
 typedef struct {
 	int(*load_symbols)(void);
 	int(*init)(void);
-	int(*play)(void);
-	int(*stop)(void);
-	int(*pause)(void);
-	int(*resume)(void);
+	md_driver_state_ret_t(*pause)(void);
+	md_driver_state_ret_t(*unpause)(void);
+	md_driver_state_ret_t(*stop)(void);
+	md_driver_state_ret_t(*resume)(void);
 	int(*get_state)(md_driver_state_t*);
 	int(*deinit)(void);
 } md_driver_ops;
@@ -50,6 +58,15 @@ int md_driver_ll_deinit(void);
 		else						\
 			md_log("Loaded driver " #_name ".");	\
 	}
+
+int md_driver_init(void);
+void md_driver_signal_state(md_driver_state_t);
+md_driver_state_ret_t md_driver_pause(void);
+md_driver_state_ret_t md_driver_unpause(void);
+md_driver_state_ret_t md_driver_stop(void);
+md_driver_state_ret_t md_driver_resume(void);
+void md_driver_error_event(void);
+int md_driver_deinit(void);
 
 DECLARE_SYM_FUNCTIONS(driver);
 

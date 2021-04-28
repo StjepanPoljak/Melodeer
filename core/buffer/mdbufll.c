@@ -133,16 +133,12 @@ md_buf_chunk_t* md_buf_get_head(void) {
 	 * to make sure -it- does not remove head when
 	 * dealing with this pointer. */
 
-	md_log("Still getting head...");
-
 	pthread_mutex_lock(&md_bufll.mutex);
 	while (!md_buf_head && md_bufll.run) {
 		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
 	}
 	ret = md_buf_head ? md_buf_head->chunk : NULL;
 	pthread_mutex_unlock(&md_bufll.mutex);
-
-	md_log("Got head!");
 
 	return ret;
 }
@@ -363,11 +359,10 @@ void md_buf_flush(void) {
 }
 
 void md_buf_resume(void) {
+
 	pthread_mutex_lock(&md_bufll.mutex);
 	md_bufll.run = true;
 	pthread_mutex_unlock(&md_bufll.mutex);
-
-	md_log("Resuming buffer engine.");
 
 	return;
 }

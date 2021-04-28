@@ -10,41 +10,6 @@
 
 // MD__play_raw wrappers
 
-bool MD__play_raw_with_decoder (MD__file_t *MD__file,
-                                void (*metadata_handle) (MD__metadata_t, void *),
-                                void (*playing_handle) (void *),
-                                void (*error_handle) (char *, void *),
-                                void (*buffer_underrun_handle) (void *),
-                                void (*completion_handle) (void *)) {
-
-    void *(* decoder)(void *) = NULL;
-
-    MD__filetype type = MD__get_filetype (MD__file->filename);
-
-    switch (type) {
-
-    case MD__FLAC:
-        decoder = MDFLAC__start_decoding;
-        break;
-
-    case MD__WAV:
-        decoder = MDWAV__parse;
-        break;
-
-    case MD__MP3:
-        decoder = MDMPG123__decoder;
-        break;
-
-    default:
-        return false;
-    }
-
-    MD__play_raw (MD__file, decoder, metadata_handle, playing_handle,
-                  error_handle, buffer_underrun_handle, completion_handle);
-
-    return true;
-}
-
 unsigned int MDFFT__lg_uint (unsigned int num) {
 
     unsigned int log_res = 1;

@@ -68,7 +68,7 @@ void md_stop_decoder_engine(void) {
 void md_start_decoder_engine(void) {
 	pthread_mutex_lock(&decoder_mutex);
 	decoder_running = true;
-	//pthread_cond_signal(&decoder_cond);
+	pthread_cond_signal(&decoder_cond);
 	pthread_mutex_unlock(&decoder_mutex);
 
 	md_log("Starting decoder engine...");
@@ -78,14 +78,10 @@ void md_start_decoder_engine(void) {
 static void* md_decoder_handler(void* data) {
 	md_decoder_t* fdecoder;
 
-	md_log("YO");
-
 	if (!md_decoder_wait(decoder_data(data))) {
 		md_log("Decoder canceled.");
 		goto exit_decoder_handler;
 	}
-
-	md_log("HERE");
 
 	if (decoder_data(data)->force_decoder) {
 		if (!(fdecoder = md_decoder_ll_find(
@@ -147,16 +143,12 @@ int md_decoder_start(const char* fpath, const char* decoder,
 
 	ret = 0;
 
-	md_log("Decoder thread...");
-
 	if ((ret = pthread_create(&decoder_data->decoder_thread,
 				  NULL, md_decoder_handler,
 				  (void*)decoder_data))) {
 		md_error("Could not create decoder thread.");
 		return ret;
 	}
-
-	md_log("Started thread...");
 
 	switch (decoder_mode) {
 	case MD_BLOCKING_DECODER:

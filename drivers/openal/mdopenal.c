@@ -310,14 +310,16 @@ md_openal_fail:
 	return ret;
 }
 
-int md_openal_stop(void) {
+md_driver_state_ret_t md_openal_stop(void) {
 
 	if (md_openal_is_playing())
 		alSourceStop(md_openal.source);
 
+	/* TODO: add drain here */
+
 	md_openal.should_be_playing = false;
 
-	return 0;
+	return MD_DRIVER_STATE_SET;
 }
 
 md_driver_t openal_driver = {
@@ -327,9 +329,9 @@ md_driver_t openal_driver = {
 	.ops = {
 		.load_symbols = md_openal_load_symbols,
 		.init = md_openal_init,
-		.play = md_openal_play,
 		.stop = md_openal_stop,
 		.pause = NULL,
+		.unpause = NULL,
 		.get_state = NULL,
 		.deinit = md_openal_deinit
 	}

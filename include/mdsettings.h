@@ -6,7 +6,6 @@
 typedef struct {
 	int buf_size;
 	int buf_num;
-	int min_buf_num;
 	int max_buf_num;
 	md_driver_t* driver;
 } md_settings_t;
