@@ -260,7 +260,6 @@ int md_paudio_deinit(void) {
 	pa_threaded_mainloop_stop(md_paudio.mainloop);
 	pa_threaded_mainloop_free(md_paudio.mainloop);
 
-
 	md_log("Pulseaudio deinitialized.");
 
 	return 0;
@@ -576,10 +575,6 @@ md_driver_state_ret_t md_paudio_stop(void) {
 }
 
 md_driver_state_ret_t md_paudio_resume(void) {
-
-	/* The driver will start receiving packages
-	 * when they arrive, so no need to set state
-	 * later (or do anything special). */
 
 	md_pa_resume();
 

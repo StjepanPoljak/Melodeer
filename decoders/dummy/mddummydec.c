@@ -40,18 +40,27 @@ int md_dummy_decode_fp(md_decoder_data_t* decoder_data) {
 		return ret;
 	}
 
-	while (fread(&buf, 1, 1, file), !feof(file))
+	while (fread(&buf, 1, 1, file), !feof(file)) {
 		ret = md_add_decoded_byte(decoder_data, buf);
-		if (ret) {
-			md_error("Error adding decoded byte.");
-			return ret;
-		}
+		if (ret)
+			goto abort_decoder;
+	}
 
 	fclose(file);
 
 	md_decoder_done(decoder_data);
 
 	return 0;
+
+abort_decoder:
+	if (ret == MD_DEC_EXIT)
+		md_log("Aborting decoder...");
+	else
+		md_error("Error adding decoded byte.");
+
+	fclose(file);
+
+	return ret;
 }
 
 bool md_dummy_decodes_file(const char* file) {

@@ -16,6 +16,11 @@
 	FUN(FLAC__stream_decoder_delete);			\
 	FUN(FLAC__stream_decoder_new);
 
+typedef struct {
+	FILE* file;
+	int ret;
+} md_flac_decoder_data_t;
+
 FLAC_SYMBOLS(md_define_fptr);
 
 #define md_flac_load_sym(_func) \
@@ -105,46 +110,71 @@ static int process_block(const FLAC__Frame* frame,
 
 			ret = md_add_decoded_byte(decoder_data,
 						  buffer[c][i] >> b);
-			if (ret) {
-				md_error("Error adding decoded byte.");
+			if (ret)
 				return ret;
-			}
 		}
 	}
 
 	return 0;
 }
 
+#define set_flac_ret(DEC_DATA, RET) do {				\
+	((md_flac_decoder_data_t*)((DEC_DATA)->data))->ret = RET;	\
+} while (0)
+
 static FLAC__StreamDecoderWriteStatus md_flac_write_cb(
 			const FLAC__StreamDecoder* decoder,
 			const FLAC__Frame* frame,
 			const FLAC__int32* const buffer[],
 			void* client_data) {
-	int i;
+	int i, ret;
 
 	for (i = 0; i < frame->header.blocksize; i++) {
-	/* --check for stop --
-	 *
-	 * return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-	 *
-	 */
-		if (process_block(frame, buffer, i,
-				 (md_decoder_data_t*)client_data)) {
-			return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-		}
+
+		ret = process_block(frame, buffer, i,
+				   (md_decoder_data_t*)client_data);
+		if (ret)
+			goto abort_flac_decoder;
+
 	}
 
 	return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
+
+abort_flac_decoder:
+
+	if (ret == MD_DEC_EXIT) {
+		md_log("Aborting FLAC decoder.");
+		set_flac_ret((md_decoder_data_t*)client_data, MD_DEC_EXIT);
+	}
+	else {
+		md_error("Error processing block.");
+		set_flac_ret((md_decoder_data_t*)client_data, ret);
+	}
+
+	return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
 }
 
 int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 	FLAC__bool ok;
 	FLAC__StreamDecoderInitStatus init_status;
 	FLAC__StreamDecoder* md_flac_decoder;
+	md_flac_decoder_data_t* flac_data;
+	FILE* file;
 	int ret;
 
 	ret = 0;
 	ok = true;
+
+	flac_data = malloc(sizeof(*flac_data));
+	if (!flac_data) {
+		md_error("Error allocating memory.");
+		ret = -ENOMEM;
+		goto exit_decoder;
+	}
+
+	flac_data->ret = 0;
+	file = (FILE*)decoder_data->data;
+	decoder_data->data = (void*)flac_data;
 
 	if (!(md_flac_decoder = FLAC__stream_decoder_new())) {
 		md_error("Could not create FLAC decoder.");
@@ -154,7 +184,7 @@ int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 
 	init_status = FLAC__stream_decoder_init_FILE(
 				md_flac_decoder,
-				(FILE*)decoder_data->data,
+				file,
 				md_flac_write_cb,
 				md_flac_metadata_cb,
 				md_flac_error_cb,
@@ -171,13 +201,15 @@ int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 	FLAC__stream_decoder_finish(md_flac_decoder);
 	FLAC__stream_decoder_delete(md_flac_decoder);
 
-	if (!ok) {
+	if (!ok && (flac_data->ret != MD_DEC_EXIT)) {
 		md_error("Could not process file.");
 		ret = -EINVAL;
 		goto exit_decoder;
 	}
 
 exit_decoder:
+	if (flac_data)
+		free(flac_data);
 	md_decoder_done(decoder_data);
 
 	return ret;

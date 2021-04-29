@@ -13,6 +13,8 @@
 
 struct md_decoder_data_t;
 
+#define MD_DEC_EXIT 1
+
 typedef enum {
 	MD_BLOCKING_DECODER,
 	MD_ASYNC_DECODER

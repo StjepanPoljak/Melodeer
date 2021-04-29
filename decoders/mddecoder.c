@@ -194,6 +194,7 @@ static int md_adjust_size(md_buf_chunk_t* chunk) {
 int md_add_decoded_byte(md_decoder_data_t* decoder_data, uint8_t byte) {
 	md_buf_chunk_t* old;
 	static md_metadata_t* oldmeta = NULL;
+	int ret;
 
 	old = decoder_data->chunk;
 
@@ -220,7 +221,9 @@ int md_add_decoded_byte(md_decoder_data_t* decoder_data, uint8_t byte) {
 			return -EINVAL;
 		}
 
-		return md_buf_add(old);
+		ret = md_buf_add(old);
+
+		return ret == MD_BUF_EXIT ? MD_DEC_EXIT : ret;
 	}
 
 	return 0;
