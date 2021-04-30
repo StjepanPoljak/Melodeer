@@ -9,6 +9,10 @@ static md_settings_t settings = {
 	.buf_size = 512,
 	.buf_num = 4,
 	.max_buf_num = 16,
+	.buf_underrun = {
+		.count = 5,
+		.secs = 1
+	},
 	.driver = NULL
 };
 

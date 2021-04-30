@@ -4,9 +4,15 @@
 #include "mddriver.h"
 
 typedef struct {
+	int count;
+	int secs;
+} md_buf_underrun_settings_t;
+
+typedef struct {
 	int buf_size;
 	int buf_num;
 	int max_buf_num;
+	md_buf_underrun_settings_t buf_underrun;
 	md_driver_t* driver;
 } md_settings_t;
 

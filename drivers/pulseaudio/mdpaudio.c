@@ -272,6 +272,7 @@ static void md_context_drain_cb(pa_context* context, void* data) {
 	md_driver_signal_state(MD_DRIVER_STOPPED);
 
 	while (!md_buf_get_head()) {
+
 		if (!md_pa_suspend()) {
 			pa_context_disconnect(context);
 			return;
@@ -398,12 +399,16 @@ static void md_pa_stream_moved_cb(pa_stream* stream, void* data) {
 }
 
 static void md_pa_stream_underflow_cb(pa_stream* stream, void* data) {
-	md_log("Underflow");
+
+	md_driver_buffer_underrun_event(false);
+
 	return;
 }
 
 static void md_pa_stream_overflow_cb(pa_stream* stream, void* data) {
+
 	md_log("Overflow");
+
 	return;
 }
 

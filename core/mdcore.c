@@ -65,6 +65,16 @@ void md_melodeer_playing(void) {
 
 void md_melodeer_paused(void) {
 
+	md_log("Melodeer paused");
+
+	return;
+}
+
+void md_buffer_underrun(bool critical) {
+
+	md_log("Buffer underrun%s", critical ? " (!)" : "");
+
+	return;
 }
 
 static md_core_ops_t md_core_ops = {
@@ -74,7 +84,8 @@ static md_core_ops_t md_core_ops = {
 	.last_chunk_take_out = md_last_chunk_take_out,
 	.stopped = md_melodeer_stopped,
 	.playing = md_melodeer_playing,
-	.paused = md_melodeer_paused
+	.paused = md_melodeer_paused,
+	.buffer_underrun = md_buffer_underrun
 };
 
 int md_init(void) {

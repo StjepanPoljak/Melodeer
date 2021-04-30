@@ -13,6 +13,7 @@ typedef struct {
 	void(*paused)(void);
 	void(*playing)(void);
 	void(*driver_error)(void);
+	void(*buffer_underrun)(bool);
 } md_core_ops_t;
 
 void md_set_core_ops(md_core_ops_t*);

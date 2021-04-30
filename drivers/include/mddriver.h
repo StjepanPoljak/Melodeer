@@ -60,6 +60,7 @@ int md_driver_ll_deinit(void);
 	}
 
 int md_driver_init(void);
+void md_driver_buffer_underrun_event(bool);
 void md_driver_signal_state(md_driver_state_t);
 md_driver_state_ret_t md_driver_pause(void);
 md_driver_state_ret_t md_driver_unpause(void);
