@@ -67,7 +67,7 @@ md_driver_state_ret_t md_driver_unpause(void);
 md_driver_state_ret_t md_driver_stop(void);
 md_driver_state_ret_t md_driver_resume(void);
 void md_driver_error_event(void);
-int md_driver_deinit(void);
+void md_driver_deinit(void);
 
 DECLARE_SYM_FUNCTIONS(driver);
 

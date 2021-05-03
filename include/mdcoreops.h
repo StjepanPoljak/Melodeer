@@ -5,23 +5,25 @@
 #include "mdmetadata.h"
 
 typedef struct {
-	void(*loaded_metadata)(md_buf_chunk_t*, md_metadata_t*);
-	void(*will_load_chunk)(md_buf_chunk_t*);
-	void(*last_chunk_take_in)(md_buf_chunk_t*);
-	void(*last_chunk_take_out)(md_buf_chunk_t*);
-	void(*stopped)(void);
-	void(*paused)(void);
-	void(*playing)(void);
-	void(*driver_error)(void);
-	void(*buffer_underrun)(bool);
+	void(*loaded_metadata)(void*, md_buf_chunk_t*, md_metadata_t*);
+	void(*will_load_chunk)(void*, md_buf_chunk_t*);
+	void(*last_chunk_take_in)(void*, md_buf_chunk_t*);
+	void(*last_chunk_take_out)(void*, md_buf_chunk_t*);
+	void(*stopped)(void*);
+	void(*paused)(void*);
+	void(*playing)(void*);
+	void(*driver_error)(void*);
+	void(*buffer_underrun)(void*, bool);
+	void* data;
 } md_core_ops_t;
 
 void md_set_core_ops(md_core_ops_t*);
 md_core_ops_t* md_get_core_ops(void);
 
-#define md_exec_event(ev_name, ...) ({				\
-	if (md_get_core_ops() && md_get_core_ops()->ev_name)	\
-		md_get_core_ops()->ev_name(__VA_ARGS__);	\
-})
+#define md_exec_event(ev_name, ...) do {				\
+	if (md_get_core_ops() && md_get_core_ops()->ev_name)		\
+		md_get_core_ops()->ev_name(				\
+			md_get_core_ops()->data, ##__VA_ARGS__);	\
+} while (0)
 
 #endif

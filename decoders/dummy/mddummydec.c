@@ -21,7 +21,7 @@ static int md_dummy_set_metadata(md_decoder_data_t* decoder_data) {
 	meta->sample_rate = 0;
 	meta->channels = 0;
 	meta->bps = 0;
-	meta->total_samples = 0;
+	meta->total_buf_chunks = 0;
 
 	md_set_metadata(decoder_data, meta);
 

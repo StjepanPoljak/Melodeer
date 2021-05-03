@@ -57,6 +57,7 @@ static bool md_decoder_wait(md_decoder_data_t* decoder) {
 }
 
 void md_stop_decoder_engine(void) {
+
 	pthread_mutex_lock(&decoder_mutex);
 	decoder_running = false;
 	pthread_cond_signal(&decoder_cond);
@@ -239,19 +240,11 @@ int md_done_take_in(void* data) {
 }
 
 int md_done_take_out(void* data) {
-	//bool md_stopped;
 
 	md_exec_event(last_chunk_take_out, (md_buf_chunk_t*)data);
 
 	free(((md_buf_chunk_t*)data)->metadata->fname);
 	free(((md_buf_chunk_t*)data)->metadata);
-
-//	pthread_mutex_lock(&decoder_mutex);
-//	md_stopped = md_buf_is_empty() && !curr_decoder;
-//	pthread_mutex_unlock(&decoder_mutex);
-//
-//	if (md_stopped)
-//		md_exec_event(melodeer_stopped);
 
 	return 0;
 }

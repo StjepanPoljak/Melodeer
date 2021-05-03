@@ -13,7 +13,8 @@ static md_settings_t settings = {
 		.count = 5,
 		.secs = 1
 	},
-	.driver = NULL
+	.driver = NULL,
+	.verbose = true
 };
 
 int load_settings(void) {

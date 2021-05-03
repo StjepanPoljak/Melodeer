@@ -15,13 +15,13 @@ static md_driver_ll* md_driverll_head;
 static int underrun_count = 0;
 static int prev_underrun_count = 0;
 
-#define md_driver_set_state(COND_SAME, OPERATION,		\
+#define md_driver_set_state(NECESSARY_COND, OPERATION,		\
 			    TARGET_STATE) ({			\
 	md_driver_state_ret_t ret;				\
 	pthread_mutex_lock(&md_driver.mutex);			\
-	if (COND_SAME)						\
+	if (TARGET_STATE)					\
 		ret = MD_DRIVER_STATE_SAME;			\
-	else if (md_driver.state != TARGET_STATE)		\
+	else if (!NECESSARY_COND)				\
 		ret = MD_DRIVER_STATE_NOT_SET;			\
 	else {							\
 		ret = OPERATION();				\
@@ -243,6 +243,15 @@ void md_driver_buffer_underrun_event(bool critical) {
 void md_driver_error_event(void) {
 
 	md_exec_event(driver_error);
+
+	return;
+}
+
+void md_driver_deinit(void) {
+
+	get_settings()->driver->ops.deinit();
+	md_driver_unload(get_settings()->driver);
+	md_garbage_deinit();
 
 	return;
 }
