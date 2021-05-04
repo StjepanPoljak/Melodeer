@@ -242,9 +242,10 @@ static bool md_buf_get_pack_cond(int count, md_pack_mode_t mode) {
 		if (get_buf_num() >= count)
 			return false;
 
-		else if (md_buf_last && md_is_decoder_done(md_buf_last->chunk) && md_no_more_decoders())
+		else if (md_buf_last
+		      && md_is_decoder_done(md_buf_last->chunk)
+		      && md_no_more_decoders())
 			return false;
-
 		else
 			return true;
 	}

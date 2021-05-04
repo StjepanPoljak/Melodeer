@@ -8,7 +8,7 @@ typedef struct {
 	int		sample_rate;
 	uint8_t		channels;
 	uint16_t	bps;
-	//int		total_samples;
+	int		total_samples;
 	int		total_buf_chunks;
 } md_metadata_t;
 

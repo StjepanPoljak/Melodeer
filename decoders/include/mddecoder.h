@@ -10,6 +10,7 @@
 #include "mdmetadata.h"
 #include "mdbufchunk.h"
 #include "mdsym.h"
+#include "mdsettings.h"
 
 struct md_decoder_data_t;
 
@@ -75,8 +76,24 @@ void md_start_decoder_engine(void);
 int md_decoder_done(md_decoder_data_t*);
 bool md_no_more_decoders(void);
 
-#define md_set_metadata(_decoder_data, _metadata) do {	\
-	(_decoder_data)->metadata = (_metadata);	\
+#define md_metadata_init(METADATA) do {		\
+	(METADATA)->fname = NULL;		\
+	(METADATA)->sample_rate = 0;		\
+	(METADATA)->channels = 0;		\
+	(METADATA)->bps = 0;			\
+	(METADATA)->total_samples = 0;		\
+	(METADATA)->total_buf_chunks = 0;	\
+} while (0)
+
+#define md_set_metadata(_decoder_data, _metadata) do {		\
+	(_decoder_data)->metadata = (_metadata);		\
+	if ((_metadata) && !((_metadata)->total_buf_chunks)) {	\
+		(_metadata)->total_buf_chunks = 		\
+			(((_metadata)->total_samples		\
+			* (_metadata)->channels			\
+			* ((_metadata)->bps / 8))		\
+			/ (get_settings()->buf_size)) + 1;	\
+	}							\
 } while (0)
 
 DECLARE_SYM_FUNCTIONS(decoder);

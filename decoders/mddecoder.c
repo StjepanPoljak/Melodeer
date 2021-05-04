@@ -67,6 +67,7 @@ void md_stop_decoder_engine(void) {
 }
 
 void md_start_decoder_engine(void) {
+
 	pthread_mutex_lock(&decoder_mutex);
 	decoder_running = true;
 	pthread_cond_signal(&decoder_cond);

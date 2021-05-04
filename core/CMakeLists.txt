@@ -1,6 +1,7 @@
 set (CORE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/mdcore.c
 	${CMAKE_CURRENT_SOURCE_DIR}/mdcoreops.c
+	${CMAKE_CURRENT_SOURCE_DIR}/mdplaylist.c
 	${CMAKE_CURRENT_SOURCE_DIR}/mdsettings.c)
 
 target_include_directories(melodeer PRIVATE include)

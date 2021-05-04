@@ -1,25 +1,19 @@
 #include "mdtime.h"
 
-unsigned long md_buff_bytes_per_sec(md_metadata_t* metadata, int buff_size) {
+unsigned long md_buf_len_usec(md_metadata_t* metadata, int buf_size) {
 
-	return (metadata->bps / 8) * metadata->channels
-	     * (metadata->sample_rate);
+	/* max bps: 24
+	 * max channels: 8
+	 * max sample_rate: 192.000
+	 * -----------------------
+	 * == 36.864.000 */
+
+	return ((unsigned long)buf_size * 8 * 1000000)
+	     / (metadata->bps * metadata->channels * metadata->sample_rate);
 }
 
-double md_buff_usec(md_metadata_t* metadata, int buff_size) {
+double md_buf_len_sec(md_metadata_t* metadata, int buf_size) {
 
-	return (buff_size * 1000000)
-	     / (double)md_buff_bytes_per_sec(metadata, buff_size);
-}
-
-double md_buff_msec(md_metadata_t* metadata, int buff_size) {
-
-	return (buff_size * 1000)
-	     / (double)md_buff_bytes_per_sec(metadata, buff_size);
-}
-
-double md_buff_sec(md_metadata_t* metadata, int buff_size) {
-
-	return buff_size
-	     / (double)md_buff_bytes_per_sec(metadata, buff_size);
+	return ((double)buf_size * 8)
+	     / (metadata->bps * metadata->channels * metadata->sample_rate);
 }

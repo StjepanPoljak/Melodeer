@@ -68,13 +68,13 @@ void md_flac_metadata_cb(const FLAC__StreamDecoder* decoder,
 		goto early_fail_metadata;
 	}
 
+	md_metadata_init(meta);
+
 	meta->fname = ((md_decoder_data_t*)client_data)->fpath;
 	meta->sample_rate = metadata->data.stream_info.sample_rate;
 	meta->channels = metadata->data.stream_info.channels;
 	meta->bps = metadata->data.stream_info.bits_per_sample;
-	meta->total_buf_chunks = metadata->data.stream_info.total_samples
-			       / get_settings()->buf_size + 1;
-//	meta->total_samples = metadata->data.stream_info.total_samples;
+	meta->total_samples = metadata->data.stream_info.total_samples;
 
 	if (metadata->type != FLAC__METADATA_TYPE_STREAMINFO) {
 		md_error("Metadata not valid.");
