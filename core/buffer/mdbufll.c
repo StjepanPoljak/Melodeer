@@ -11,6 +11,7 @@
 #include "mdgarbage.h"
 #include "mdevq.h"
 #include "mddecoder.h"
+#include "mdpredict.h"
 
 #define get_bufll_pack(buf_pack)					\
 	get_pack_data(buf_pack, struct md_bufll_pack_t)
@@ -39,7 +40,7 @@ static struct md_bufll_t {
 
 int md_buf_init(void) {
 
-	if (md_garbage_init(get_settings()->buf_num)) {
+	if (md_unlikely(md_garbage_init(get_settings()->buf_num))) {
 		md_error("Could not initialize garbage collector.");
 		return -ENOMEM;
 	}
@@ -92,14 +93,14 @@ int md_buf_add(md_buf_chunk_t* buf_chunk) {
 	while (md_bufll.run && md_buf_add_cond())
 		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
 
-	if (!md_bufll.run) {
+	if (md_unlikely(!md_bufll.run)) {
 		ret = md_bufll.error ? MD_BUF_ERROR : MD_BUF_EXIT;
 		md_bufll.error = false;
 		pthread_mutex_unlock(&md_bufll.mutex);
 		return ret;
 	}
 
-	if (!md_buf_head) {
+	if (md_unlikely(!md_buf_head)) {
 		new_buf->order = 0;
 		md_buf_head = new_buf;
 		md_buf_last = md_buf_head;
@@ -164,7 +165,7 @@ int md_buf_get(md_buf_chunk_t** buf_chunk) {
 md_buf_chunk_t* md_bufll_first(md_buf_pack_t* buf_pack) {
 	md_buf_chunk_t* curr_chunk;
 
-	if (!get_bufll_pack(buf_pack)->head)
+	if (md_unlikely(!get_bufll_pack(buf_pack)->head))
 		return NULL;
 
 	get_bufll_pack(buf_pack)->curr = get_bufll_pack(buf_pack)->head;
@@ -181,12 +182,12 @@ md_buf_chunk_t* md_bufll_next(md_buf_pack_t* buf_pack) {
 	md_buf_chunk_t* curr_chunk;
 
 	curr = get_bufll_pack(buf_pack)->curr;
-	if (!curr)
+	if (md_unlikely(!curr))
 		return NULL;
 
 	get_bufll_pack(buf_pack)->curr = (curr = curr->next);
 
-	if (curr) {
+	if (md_likely(curr)) {
 		curr_chunk = curr->chunk;
 		md_evq_run_queue(curr_chunk->evq, MD_EVENT_RUN_ON_TAKE_IN);
 		md_exec_event(will_load_chunk, curr->chunk);
@@ -237,14 +238,14 @@ bool md_buf_is_empty(void) {
 
 static bool md_buf_get_pack_cond(int count, md_pack_mode_t mode) {
 
-	if (mode == MD_PACK_EXACT) {
+	if (md_likely(mode == MD_PACK_EXACT)) {
 
 		if (get_buf_num() >= count)
 			return false;
 
-		else if (md_buf_last
+		else if (md_unlikely(md_buf_last
 		      && md_is_decoder_done(md_buf_last->chunk)
-		      && md_no_more_decoders())
+		      && md_no_more_decoders()))
 			return false;
 		else
 			return true;
@@ -284,7 +285,7 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 	while (md_bufll.run && md_buf_get_pack_cond(*count, pack_mode))
 		pthread_cond_wait(&md_bufll.cond, &md_bufll.mutex);
 
-	if (!md_bufll.run) {
+	if (md_unlikely(!md_bufll.run)) {
 		ret = md_bufll.error ? MD_BUF_ERROR : MD_BUF_EXIT;
 		md_bufll.error = false;
 		pthread_mutex_unlock(&md_bufll.mutex);
@@ -300,24 +301,24 @@ int md_buf_get_pack(md_buf_pack_t** buf_pack, int* count,
 
 	for (i = 0; i < *count; i++) {
 
-		if (!curr) {
+		if (md_unlikely(!curr)) {
 			*count = i;
-			if (*count != i)
+			if (md_unlikely(*count != i))
 				ret = MD_PACK_EXACT_NO_MORE;
 			break;
 		}
-		else if (md_will_stop_on(curr)) {
+		else if (md_unlikely(md_will_stop_on(curr))) {
 			curr = curr->next;
 			*count = i + 1;
 			ret = MD_BUF_NO_DECODERS;
 
 			break;
 		}
-		else if (i < *count - 1)
+		else if (md_likely(i < *count - 1))
 			curr = curr->next;
 	}
 
-	if (curr) {
+	if (md_likely(curr)) {
 		md_buf_head = curr->next;
 		if (!md_buf_head)
 			md_buf_last = NULL;

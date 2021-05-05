@@ -5,6 +5,7 @@
 
 #include "mdlog.h"
 #include "mdsettings.h"
+#include "mdpredict.h"
 
 int md_buf_chunk_init(void) {
 
@@ -16,13 +17,13 @@ static md_buf_chunk_t* md_buf_chunk_new(int order) {
 
 	curr = malloc(sizeof(*curr)
 		    + sizeof(*curr->chunk) * get_settings()->buf_size);
-	if (!curr) {
+	if (md_unlikely(!curr)) {
 		md_error("Could not allocate memory.");
 		return NULL;
 	}
 
 	curr->evq = malloc(sizeof(*curr->evq));
-	if (!curr->evq) {
+	if (md_unlikely(!curr->evq)) {
 		md_error("Could not allocate memory for event queue.");
 		return NULL;
 	}
@@ -43,9 +44,11 @@ md_buf_chunk_t* md_buf_chunk_append_byte(md_buf_chunk_t* buf_chunk,
 
 	order = buf_chunk ? buf_chunk->order + 1 : 0;
 
-	if (!buf_chunk || (buf_chunk->size >= get_settings()->buf_size)) {
+	if (md_unlikely(!buf_chunk ||
+			(buf_chunk->size >= get_settings()->buf_size))) {
 
-		if (!(curr = md_buf_chunk_new(order))) {
+		curr = md_buf_chunk_new(order);
+		if (md_unlikely(!curr)) {
 			md_error("Could not create new chunk.");
 			return NULL;
 		}

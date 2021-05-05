@@ -225,10 +225,10 @@ static int md_paudio_add_to_buffer(md_buf_pack_t* buf_pack,
 	while (curr_chunk) {
 
 /* if we're debugging and the kid is asleep, turn the volume down */
-
+/*
 		for (int j = 0; j < curr_chunk->size; j++)
 			curr_chunk->chunk[j] = 0;
-
+*/
 		if (pa_stream_write(stream, curr_chunk->chunk,
 				    curr_chunk->size, NULL,
 				    0, PA_SEEK_RELATIVE) < 0) {

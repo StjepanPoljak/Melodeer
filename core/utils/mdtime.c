@@ -12,6 +12,12 @@ unsigned long md_buf_len_usec(md_metadata_t* metadata, int buf_size) {
 	     / (metadata->bps * metadata->channels * metadata->sample_rate);
 }
 
+int md_usec_to_buf_chunks(md_metadata_t* metadata,
+			  int buf_size, unsigned long usec) {
+
+	return usec / md_buf_len_usec(metadata, buf_size);
+}
+
 double md_buf_len_sec(md_metadata_t* metadata, int buf_size) {
 
 	return ((double)buf_size * 8)
