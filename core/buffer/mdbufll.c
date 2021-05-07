@@ -172,7 +172,8 @@ md_buf_chunk_t* md_bufll_first(md_buf_pack_t* buf_pack) {
 	curr_chunk = get_bufll_pack(buf_pack)->curr->chunk;
 
 	md_evq_run_queue(curr_chunk->evq, MD_EVENT_RUN_ON_TAKE_IN);
-	md_exec_event(will_load_chunk, curr_chunk);
+
+	md_will_load_chunk_exec(curr_chunk);
 
 	return curr_chunk;
 }
@@ -190,7 +191,7 @@ md_buf_chunk_t* md_bufll_next(md_buf_pack_t* buf_pack) {
 	if (md_likely(curr)) {
 		curr_chunk = curr->chunk;
 		md_evq_run_queue(curr_chunk->evq, MD_EVENT_RUN_ON_TAKE_IN);
-		md_exec_event(will_load_chunk, curr->chunk);
+		md_will_load_chunk_exec(curr_chunk);
 
 		return curr_chunk;
 	}

@@ -131,7 +131,7 @@ int md_paudio_load_symbols(void) {
 
 typedef enum {
 	MD_PA_STOPPED,
-	MD_PA_PLAYING,
+	MD_PA_RUNNING,
 	MD_PA_EXIT
 } md_pa_state_t;
 
@@ -171,7 +171,7 @@ static void md_pa_resume(void) {
 		pthread_mutex_unlock(&md_paudio.mutex);
 		return;
 	}
-	md_paudio.state = MD_PA_PLAYING;
+	md_paudio.state = MD_PA_RUNNING;
 	pthread_cond_signal(&md_paudio.cond);
 	pthread_mutex_unlock(&md_paudio.mutex);
 
@@ -225,10 +225,10 @@ static int md_paudio_add_to_buffer(md_buf_pack_t* buf_pack,
 	while (curr_chunk) {
 
 /* if we're debugging and the kid is asleep, turn the volume down */
-/*
+
 		for (int j = 0; j < curr_chunk->size; j++)
 			curr_chunk->chunk[j] = 0;
-*/
+
 		if (pa_stream_write(stream, curr_chunk->chunk,
 				    curr_chunk->size, NULL,
 				    0, PA_SEEK_RELATIVE) < 0) {
@@ -556,7 +556,7 @@ int md_paudio_init(void) {
 
 	pthread_mutex_init(&md_paudio.mutex, NULL);
 	pthread_cond_init(&md_paudio.cond, NULL);
-	md_paudio.state = MD_PA_PLAYING;
+	md_paudio.state = MD_PA_RUNNING;
 
 	if (pa_threaded_mainloop_start(md_paudio.mainloop) < 0) {
 		md_pa_error(NULL, "Could not run main loop.");

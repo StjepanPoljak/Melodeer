@@ -2,8 +2,9 @@
 #define MD_CORE_H
 
 #include "mddriver.h"
+#include "mdcoreops.h"
 
-int md_init(void);
+int md_init(md_core_ops_t*);
 void md_stop(void);
 void md_resume(void);
 int md_play_async(const char*, const char*);

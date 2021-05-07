@@ -86,6 +86,7 @@ static md_core_ops_t md_core_ops = {
 };
 
 int main (int argc, const char* argv[]) {
+	int i;
 
 	if (argc <= 1) {
 		md_error("Please specify files to play.");
@@ -98,9 +99,12 @@ int main (int argc, const char* argv[]) {
 
 	md_log("Got playlist of size: %d", argc - 1);
 
-	md_playlist_init(&md_core_ops);
+	md_playlist_init(&md_core_ops, NULL);
 
-	md_playlist_play(argc - 1, &(argv[1]));
+	for (i = 1; i < argc; i++)
+		md_playlist_append(argv[i]);
+
+	md_playlist_play();
 
 	md_log("Deinitializing...");
 

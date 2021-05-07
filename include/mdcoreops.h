@@ -20,10 +20,15 @@ typedef struct {
 void md_set_core_ops(md_core_ops_t*);
 md_core_ops_t* md_get_core_ops(void);
 
+#define md_will_load_chunk_exec(CHUNK) do {				\
+	md_get_core_ops()->will_load_chunk(md_get_core_ops()->data,	\
+					   CHUNK);			\
+} while (0)
+
 #define md_exec_event(ev_name, ...) do {				\
-	if (md_get_core_ops() && md_get_core_ops()->ev_name)		\
-		md_get_core_ops()->ev_name(				\
-			md_get_core_ops()->data, ##__VA_ARGS__);	\
+	if (md_get_core_ops()->ev_name)					\
+		md_get_core_ops()->ev_name(md_get_core_ops()->data,	\
+					   ##__VA_ARGS__);		\
 } while (0)
 
 #endif

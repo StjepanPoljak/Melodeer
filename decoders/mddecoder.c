@@ -20,10 +20,21 @@ static bool decoder_running;
 
 DEFINE_SYM_FUNCTIONS(decoder);
 
+void md_decoder_init(void) {
+
+	curr_decoder = NULL;
+	decoder_running = true;
+
+	pthread_mutex_init(&decoder_mutex, NULL);
+	pthread_cond_init(&decoder_cond, NULL);
+
+	return;
+}
+
 static int md_decode_as_fp(md_decoder_data_t* decoder_data) {
 	FILE* f;
 
-	f = fopen(decoder_data->fpath, "rw");
+	f = fopen(decoder_data->fpath, "r");
 	if (!f) {
 		md_error("Could not open file %s.", decoder_data->fpath);
 		return -EINVAL;
@@ -304,17 +315,6 @@ int md_decoder_done(md_decoder_data_t* decoder_data) {
 	}
 
 	return ret;
-}
-
-void md_decoder_init(void) {
-
-	curr_decoder = NULL;
-	decoder_running = true;
-
-	pthread_mutex_init(&decoder_mutex, NULL);
-	pthread_cond_init(&decoder_cond, NULL);
-
-	return;
 }
 
 void md_decoder_deinit(void) {

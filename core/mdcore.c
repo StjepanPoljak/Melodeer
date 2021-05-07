@@ -7,13 +7,15 @@
 #include "mdbuf.h"
 #include "mddecoder.h"
 
-int md_init(void) {
+int md_init(md_core_ops_t* md_core_ops) {
 	int ret;
 
 	if ((ret = load_settings())) {
 		md_error("Error loading settings.");
 		return ret;
 	}
+
+	md_set_core_ops(md_core_ops);
 
 	md_buf_init();
 	md_driver_init();
