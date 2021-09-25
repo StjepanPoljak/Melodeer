@@ -6,7 +6,7 @@
 #include "mdlog.h"
 
 static md_settings_t settings = {
-	.buf_size = 512,
+	.buf_size = 24 * 16 * 4,
 	.buf_num = 4,
 	.max_buf_num = 16,
 	.buf_underrun = {

@@ -7,6 +7,7 @@
 typedef struct {
 	void(*loaded_metadata)(void*, md_buf_chunk_t*, md_metadata_t*);
 	void(*will_load_chunk)(void*, md_buf_chunk_t*);
+	void(*first_chunk_take_in)(void*, md_buf_chunk_t*);
 	void(*last_chunk_take_in)(void*, md_buf_chunk_t*);
 	void(*last_chunk_take_out)(void*, md_buf_chunk_t*);
 	void(*stopped)(void*);

@@ -56,8 +56,17 @@ int md_decoder_ll_deinit(void);
 			md_log("Loaded decoder " #_name ".");	\
 	}
 
+typedef enum {
+	MD_DEC_STARTED,
+	MD_DEC_CANCELLED
+} dec_status_t;
+
 void md_decoder_init(void);
-int md_decoder_start(const char*, const char*, md_decoding_mode_t);
+int md_decoder_start(const char*, const char*,
+		     md_decoding_mode_t);
+int md_decoder_start_id(const char*, const char*,
+			md_decoding_mode_t, int,
+			void(*completion)(int, dec_status_t));
 void md_decoder_deinit(void);
 
 typedef struct md_decoder_data_t {
@@ -68,10 +77,13 @@ typedef struct md_decoder_data_t {
 	md_buf_chunk_t* chunk;
 	void* data;
 	pthread_t decoder_thread;
+	int id;
+	void(*dec_completion)(int, dec_status_t);
 } md_decoder_data_t;
 
 int md_add_decoded_byte(md_decoder_data_t*, uint8_t);
 void md_stop_decoder_engine(void);
+bool md_cancel_queued(int);
 void md_start_decoder_engine(void);
 int md_decoder_done(md_decoder_data_t*);
 bool md_no_more_decoders(void);

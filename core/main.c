@@ -73,9 +73,15 @@ static void md_will_load_chunk(void* data, md_buf_chunk_t* buf_chunk) {
 	return;
 }
 
+static void md_first_chunk_take_in(void* data, md_buf_chunk_t* chunk) {
+
+	return;
+}
+
 static md_core_ops_t md_core_ops = {
 	.will_load_chunk = md_will_load_chunk,
 	.loaded_metadata = md_loaded_metadata,
+	.first_chunk_take_in = md_first_chunk_take_in,
 	.last_chunk_take_in = md_last_chunk_take_in,
 	.last_chunk_take_out = md_last_chunk_take_out,
 	.stopped = md_melodeer_stopped,

@@ -225,10 +225,10 @@ static int md_paudio_add_to_buffer(md_buf_pack_t* buf_pack,
 	while (curr_chunk) {
 
 /* if we're debugging and the kid is asleep, turn the volume down */
-
+/*
 		for (int j = 0; j < curr_chunk->size; j++)
 			curr_chunk->chunk[j] = 0;
-
+*/
 		if (pa_stream_write(stream, curr_chunk->chunk,
 				    curr_chunk->size, NULL,
 				    0, PA_SEEK_RELATIVE) < 0) {
@@ -365,6 +365,17 @@ static void md_pa_stream_write_cb(pa_stream* stream,
 	return;
 }
 
+static void md_paudio_unpause_success_cb(pa_stream* stream,
+					 int success, void* data) {
+
+	if (success)
+		md_driver_signal_state(MD_DRIVER_PLAYING);
+	else
+		md_pa_error(NULL, "Could not unpause stream.");
+
+	return;
+}
+
 static void md_pa_stream_state_cb(pa_stream* stream, void* data) {
 
 	switch (pa_stream_get_state(stream)) {
@@ -376,6 +387,7 @@ static void md_pa_stream_state_cb(pa_stream* stream, void* data) {
 		break;
 	case PA_STREAM_READY:
 		md_log("Stream ready...");
+		pa_stream_cork(stream, 0, md_paudio_unpause_success_cb, NULL);
 		break;
 	case PA_STREAM_FAILED:
 		md_pa_error(NULL, "Stream failed...");
@@ -398,6 +410,13 @@ static void md_pa_stream_moved_cb(pa_stream* stream, void* data) {
 	return;
 }
 
+static void md_pa_stream_started_cb(pa_stream* stream, void* data) {
+
+	md_driver_signal_state(MD_DRIVER_PLAYING);
+
+	return;
+}
+
 static void md_pa_stream_underflow_cb(pa_stream* stream, void* data) {
 
 	md_driver_buffer_underrun_event(false);
@@ -408,13 +427,6 @@ static void md_pa_stream_underflow_cb(pa_stream* stream, void* data) {
 static void md_pa_stream_overflow_cb(pa_stream* stream, void* data) {
 
 	md_log("Overflow");
-
-	return;
-}
-
-static void md_pa_stream_started_cb(pa_stream* stream, void* data) {
-
-	md_driver_signal_state(MD_DRIVER_PLAYING);
 
 	return;
 }
@@ -478,6 +490,12 @@ static void md_pa_new_stream(pa_context* context, void* data) {
 				     md_pa_stream_event_cb, NULL);
 	pa_stream_set_buffer_attr_callback(md_paudio.stream,
 					   md_pa_stream_buffer_attr_cb, NULL);
+
+	md_paudio.stream_flags = PA_STREAM_INTERPOLATE_TIMING
+			       | PA_STREAM_ADJUST_LATENCY
+			       | PA_STREAM_AUTO_TIMING_UPDATE
+			       | PA_STREAM_NOT_MONOTONIC
+			       | PA_STREAM_START_CORKED;
 
 	if (pa_stream_connect_playback(md_paudio.stream, NULL,
 				       &md_paudio.buffer_attr,
@@ -548,8 +566,10 @@ int md_paudio_init(void) {
 					   "Melodeer");
 
 	memset(&md_paudio.buffer_attr, 0, sizeof(md_paudio.buffer_attr));
+	md_paudio.buffer_attr.fragsize = (uint32_t)-1;
+	md_paudio.buffer_attr.tlength = (uint32_t)buf_size * buf_num;
 	md_paudio.buffer_attr.maxlength = (uint32_t)-1;
-	md_paudio.buffer_attr.prebuf = (uint32_t)buf_size * buf_num;
+	md_paudio.buffer_attr.prebuf = (uint32_t)-1; // buf_size * buf_num;
 	md_paudio.buffer_attr.minreq = (uint32_t)buf_size;
 
 	md_pa_setup_context();
@@ -616,17 +636,6 @@ static void md_paudio_pause_success_cb(pa_stream* stream,
 md_driver_state_ret_t md_paudio_pause(void) {
 
 	return md_paudio_cork(0, md_paudio_pause_success_cb);
-}
-
-static void md_paudio_unpause_success_cb(pa_stream* stream,
-					 int success, void* data) {
-
-	if (success)
-		md_driver_signal_state(MD_DRIVER_PLAYING);
-	else
-		md_pa_error(NULL, "Could not unpause stream.");
-
-	return;
 }
 
 md_driver_state_ret_t md_paudio_unpause(void) {

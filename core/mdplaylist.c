@@ -10,6 +10,12 @@
 #include "mdpredict.h"
 
 typedef enum {
+	MD_PL_QUEUING,
+	MD_PL_PLAYING,
+	MD_PL_NONE
+} md_curr_status_t;
+
+typedef enum {
 	MD_PL_SWITCH_PERCENT,
 	MD_PL_SWITCH_USECONDS,
 	MD_PL_SWITCH_BUFF_CHUNKS
@@ -23,6 +29,7 @@ typedef struct {
 struct md_pl_ll_t {
 	int index;
 	char* fname;
+	md_curr_status_t status;
 	struct md_pl_ll_t* next;
 	struct md_pl_ll_t* prev;
 };
@@ -34,6 +41,7 @@ static struct md_playlist_t {
 	md_pl_ll_t* curr;
 	md_pl_ll_t* head;
 	md_pl_ll_t* last;
+	pthread_mutex_t lmutex;
 
 	bool running;
 	md_pl_settings_t settings;
@@ -42,6 +50,7 @@ static struct md_playlist_t {
 	md_core_ops_t md_core_ops;
 	void(*will_load_chunk_usr_cb)(void*, md_buf_chunk_t*);
 	void(*stopped_usr_cb)(void*);
+	void(*start_take_in_usr_cb)(void*, md_buf_chunk_t*);
 	void(*last_chunk_take_in_usr_cb)(void*, md_buf_chunk_t*);
 	void(*started_playing_file)(int, const char*, void*, md_buf_chunk_t*);
 } mdplaylist;
@@ -117,27 +126,29 @@ static void md_pl_started_playing_file_default_cb(int index,
 	return;
 }
 
+static int decoder_start_event = 0;
+
+static void md_pl_start_take_in_cb(void* data, md_buf_chunk_t* buf_chunk) {
+
+	if (md_likely(mdplaylist.curr->next))
+		md_playlist_setup_start_event(data, buf_chunk,
+					      &decoder_start_event);
+
+	mdplaylist.started_playing_file(mdplaylist.curr->index,
+					mdplaylist.curr->fname,
+					data, buf_chunk);
+
+	mdplaylist.start_take_in_usr_cb(mdplaylist.md_core_ops.data,
+					buf_chunk);
+
+	return;
+}
+
 static void md_pl_will_load_chunk_cb(void* data, md_buf_chunk_t* buf_chunk) {
-	static int decoder_start_event = 0;
-	
-	if (md_unlikely(!mdplaylist.curr))
-		return;
 
-	if (md_unlikely(buf_chunk->order == 0)) {
-
-		if (md_likely(mdplaylist.curr->next))
-			md_playlist_setup_start_event(data, buf_chunk,
-						      &decoder_start_event);
-
-		mdplaylist.started_playing_file(mdplaylist.curr->index,
-						mdplaylist.curr->fname,
-						data, buf_chunk);
-	}
-
-	if (md_unlikely(buf_chunk->order == decoder_start_event)) {
-		if (md_likely(mdplaylist.curr->next))
+	if (md_unlikely(buf_chunk->order == decoder_start_event))
+		if (md_likely(mdplaylist.curr && mdplaylist.curr->next))
 			md_play_async(mdplaylist.curr->next->fname, NULL);
-	}
 
 	decoder_start_event =  decoder_start_event
 			    * (buf_chunk->order
@@ -153,6 +164,8 @@ static void md_pl_last_chunk_take_in_cb(void* data, md_buf_chunk_t* chunk) {
 	(void)data, (void)chunk;
 
 	mdplaylist.curr = mdplaylist.curr->next;
+
+	mdplaylist.last_chunk_take_in_usr_cb(data, chunk);
 
 	return;
 }
@@ -178,6 +191,7 @@ int md_playlist_append(const char* fname) {
 
 	new->fname = strdup(fname);
 
+	pthread_mutex_lock(&mdplaylist.lmutex);
 	if (md_unlikely(!mdplaylist.last && !mdplaylist.head)) {
 		new->next = NULL;
 		new->prev = NULL;
@@ -194,6 +208,7 @@ int md_playlist_append(const char* fname) {
 	}
 
 	mdplaylist.size++;
+	pthread_mutex_unlock(&mdplaylist.lmutex);
 
 	return 0;
 }
@@ -209,10 +224,13 @@ void md_playlist_init(md_core_ops_t* md_pl_ops,
 	mdplaylist.md_core_ops.stopped = md_pl_stopped_cb;
 	mdplaylist.md_core_ops.last_chunk_take_in
 					= md_pl_last_chunk_take_in_cb;
+	mdplaylist.md_core_ops.first_chunk_take_in
+					= md_pl_start_take_in_cb;
 
 	mdplaylist.will_load_chunk_usr_cb = md_pl_ops->will_load_chunk;
 	mdplaylist.stopped_usr_cb = md_pl_ops->stopped;
 	mdplaylist.last_chunk_take_in_usr_cb = md_pl_ops->last_chunk_take_in;
+	mdplaylist.start_take_in_usr_cb = md_pl_ops->first_chunk_take_in;
 
 	mdplaylist.started_playing_file
 				= started_playing_file
@@ -232,6 +250,7 @@ void md_playlist_init(md_core_ops_t* md_pl_ops,
 	mdplaylist.settings.pl_switch = MD_PL_SWITCH_USECONDS;
 	mdplaylist.settings.pl_switch_value = 60000000;
 
+	pthread_mutex_init(&mdplaylist.lmutex, NULL);
 	pthread_mutex_init(&mdplaylist.mutex, NULL);
 	pthread_cond_init(&mdplaylist.cond, NULL);
 

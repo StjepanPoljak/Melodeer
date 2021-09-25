@@ -16,14 +16,18 @@ static md_decoder_ll* md_decoderll_head;
 static pthread_mutex_t decoder_mutex;
 static pthread_cond_t decoder_cond;
 static md_decoder_data_t* curr_decoder;
+static md_decoder_data_t* queued_decoder;
 static bool decoder_running;
+static bool decoder_trigger;
 
 DEFINE_SYM_FUNCTIONS(decoder);
 
 void md_decoder_init(void) {
 
 	curr_decoder = NULL;
+	queued_decoder = NULL;
 	decoder_running = true;
+	decoder_trigger = false;
 
 	pthread_mutex_init(&decoder_mutex, NULL);
 	pthread_cond_init(&decoder_cond, NULL);
@@ -57,10 +61,19 @@ static bool md_decoder_wait(md_decoder_data_t* decoder) {
 	bool ret;
 
 	pthread_mutex_lock(&decoder_mutex);
-	while (curr_decoder && decoder_running)
+	queued_decoder = decoder;
+
+	while (curr_decoder && decoder_running && !decoder_trigger)
 		pthread_cond_wait(&decoder_cond, &decoder_mutex);
-	if (decoder_running)
+
+	if (decoder_running && !decoder_trigger)
 		curr_decoder = decoder;
+
+	else if (decoder_trigger)
+		decoder_trigger = false;
+
+	queued_decoder = NULL;
+
 	ret = decoder_running;
 	pthread_mutex_unlock(&decoder_mutex);
 
@@ -77,6 +90,20 @@ void md_stop_decoder_engine(void) {
 	return;
 }
 
+bool md_cancel_queued(int id) {
+	int ret;
+
+	pthread_mutex_lock(&decoder_mutex);
+	ret = queued_decoder && (queued_decoder->id == id);
+	if (ret) {
+		decoder_trigger = true;
+		pthread_cond_signal(&decoder_cond);
+	}
+	pthread_mutex_unlock(&decoder_mutex);
+
+	return ret;
+}
+
 void md_start_decoder_engine(void) {
 
 	pthread_mutex_lock(&decoder_mutex);
@@ -88,15 +115,28 @@ void md_start_decoder_engine(void) {
 
 	return;
 }
+
+#define dec_completion(STATUS) do {				\
+	if (decoder_data(data)->dec_completion)			\
+		decoder_data(data)->dec_completion(		\
+					decoder_data(data)->id,	\
+					STATUS);		\
+} while (0)
+
 static void* md_decoder_handler(void* data) {
 	md_decoder_t* fdecoder;
 
 	if (!md_decoder_wait(decoder_data(data))) {
 		md_log("Decoder canceled.");
+		dec_completion(MD_DEC_CANCELLED);
+
 		goto exit_decoder_handler;
 	}
 
+	dec_completion(MD_DEC_STARTED);
+
 	if (decoder_data(data)->force_decoder) {
+
 		if (!(fdecoder = md_decoder_ll_find(
 				decoder_data(data)->force_decoder))) {
 			md_error("Could not find decoder %s.",
@@ -130,8 +170,9 @@ exit_decoder_handler:
 	return NULL;
 }
 
-int md_decoder_start(const char* fpath, const char* decoder,
-		     md_decoding_mode_t decoder_mode) {
+int md_decoder_start_id(const char* fpath, const char* decoder,
+			md_decoding_mode_t decoder_mode, int id,
+			void(*completion)(int, dec_status_t)) {
 	int ret;
 	md_decoder_data_t* decoder_data;
 
@@ -153,6 +194,8 @@ int md_decoder_start(const char* fpath, const char* decoder,
 	decoder_data->metadata = NULL;
 	decoder_data->fdecoder = NULL;
 	decoder_data->data = NULL;
+	decoder_data->id = id;
+	decoder_data->dec_completion = completion;
 
 	ret = 0;
 
@@ -165,24 +208,35 @@ int md_decoder_start(const char* fpath, const char* decoder,
 
 	switch (decoder_mode) {
 	case MD_BLOCKING_DECODER:
+
 		if ((ret = pthread_join(decoder_data->decoder_thread,
 					NULL))) {
 			md_error("Could not join thread.");
 			return ret;
 		}
 		break;
+
 	case MD_ASYNC_DECODER:
+
 		if ((ret = pthread_detach(decoder_data->decoder_thread))) {
 			md_error("Could not detach thread.");
 			return ret;
 		}
 		break;
+
 	default:
 		md_error("Internal bug: should never be here.");
+
 		return -EINVAL;
 	}
 
 	return ret;
+}
+
+int md_decoder_start(const char* fpath, const char* decoder,
+		     md_decoding_mode_t decoder_mode) {
+
+	return md_decoder_start_id(fpath, decoder, decoder_mode, 0, NULL);
 }
 
 static int md_adjust_size(md_buf_chunk_t* chunk) {
@@ -200,6 +254,13 @@ static int md_adjust_size(md_buf_chunk_t* chunk) {
 		for (i = 0; i < MD_BUFFER_PADDING - size_remainder; i++)
 			chunk->chunk[chunk->size++] = 0;
 	}
+
+	return 0;
+}
+
+int md_start_take_in(void* data) {
+
+	md_exec_event(first_chunk_take_in, (md_buf_chunk_t*)data);
 
 	return 0;
 }
@@ -224,6 +285,9 @@ int md_add_decoded_byte(md_decoder_data_t* decoder_data, uint8_t byte) {
 			md_exec_event(loaded_metadata, decoder_data->chunk,
 				      decoder_data->metadata);
 			oldmeta = decoder_data->metadata;
+			md_evq_add_event(old->evq, MD_EVENT_RUN_ON_TAKE_IN,
+					 md_start_take_in,
+					 (void*)old);
 		}
 
 		old->metadata = decoder_data->metadata;
@@ -245,7 +309,6 @@ int md_add_decoded_byte(md_decoder_data_t* decoder_data, uint8_t byte) {
 int md_done_take_in(void* data) {
 
 	((md_buf_chunk_t*)data)->size ^= MD_DECODER_DONE_BIT;
-
 	md_exec_event(last_chunk_take_in, (md_buf_chunk_t*)data);
 
 	return 0;
