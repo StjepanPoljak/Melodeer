@@ -32,6 +32,7 @@ install(DIRECTORY DESTINATION include/melodeer)
 
 install(TARGETS melodeer DESTINATION lib)
 install(DIRECTORY include/ DESTINATION include/melodeer)
+install(TARGETS melodeer-exec DESTINATION bin)
 
 add_subdirectory(core)
 add_subdirectory(decoders)
