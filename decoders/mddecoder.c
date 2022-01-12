@@ -151,6 +151,7 @@ static void* md_decoder_handler(void* data) {
 	}
 
 	decoder_data(data)->fdecoder = fdecoder;
+	decoder_data(data)->buff = NULL;
 
 	if (md_decoder_try_load(fdecoder)) {
 		md_error("Could not open library for %s decoder.",
@@ -158,8 +159,24 @@ static void* md_decoder_handler(void* data) {
 		goto exit_decoder_handler;
 	}
 
-	if (fdecoder->ops.decode_fp)
+	if (fdecoder->ops.decode_bytes) {
+		FILE* file;
+		md_log("Decoding as bytes...");
+		file = fopen(decoder_data(data)->fpath, "r");
+		fseek(file, 0L, SEEK_END);
+		decoder_data(data)->size = ftell(file);
+		decoder_data(data)->pos = 0;
+		decoder_data(data)->buff = malloc(decoder_data(data)->size);
+		rewind(file);
+		decoder_data(data)->size = fread(decoder_data(data)->buff, 1,
+						 decoder_data(data)->size,
+						 file);
+		fclose(file);
+		decoder_data(data)->fdecoder->ops.decode_bytes(decoder_data(data));
+	}
+	else if (fdecoder->ops.decode_fp) {
 		md_decode_as_fp(decoder_data(data));
+	}
 
 exit_decoder_handler:
 
@@ -376,6 +393,9 @@ int md_decoder_done(md_decoder_data_t* decoder_data) {
 		pthread_cond_signal(&decoder_cond);
 		pthread_mutex_unlock(&decoder_mutex);
 	}
+
+	if (decoder_data->buff)
+		free(decoder_data->buff);
 
 	return ret;
 }

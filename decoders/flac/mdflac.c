@@ -11,6 +11,7 @@
 
 #define FLAC_SYMBOLS(FUN)					\
 	FUN(FLAC__stream_decoder_init_FILE);			\
+	FUN(FLAC__stream_decoder_init_stream);			\
 	FUN(FLAC__stream_decoder_process_until_end_of_stream);	\
 	FUN(FLAC__stream_decoder_finish);			\
 	FUN(FLAC__stream_decoder_delete);			\
@@ -51,6 +52,7 @@ int md_flac_load_symbols(void) {
 }
 
 #define FLAC__stream_decoder_init_FILE FLAC__stream_decoder_init_FILE_ptr
+#define FLAC__stream_decoder_init_stream FLAC__stream_decoder_init_stream_ptr
 #define FLAC__stream_decoder_process_until_end_of_stream \
 	FLAC__stream_decoder_process_until_end_of_stream_ptr
 #define FLAC__stream_decoder_finish FLAC__stream_decoder_finish_ptr
@@ -156,7 +158,26 @@ abort_flac_decoder:
 	return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
 }
 
-int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
+FLAC__StreamDecoderReadStatus md_flac_read_cb(
+					const FLAC__StreamDecoder* decoder,
+					FLAC__byte buffer[], size_t* bytes,
+					void* client_data) {
+	md_decoder_data_t* decoder_data = (md_decoder_data_t*)client_data;
+	if (*bytes <= 0)
+		return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
+	else if (*bytes + decoder_data->pos > decoder_data->size) {
+		*bytes = 0;
+		return FLAC__STREAM_DECODER_READ_STATUS_END_OF_STREAM;
+	}
+	else {
+		memcpy(buffer, &(decoder_data->buff[decoder_data->pos]),
+		       *bytes);
+		decoder_data->pos += *bytes;
+		return FLAC__STREAM_DECODER_READ_STATUS_CONTINUE;
+	}
+}
+
+static int md_flac_decode_raw(md_decoder_data_t* decoder_data, bool decode_fp) {
 	FLAC__bool ok;
 	FLAC__StreamDecoderInitStatus init_status;
 	FLAC__StreamDecoder* md_flac_decoder;
@@ -184,14 +205,27 @@ int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
 		goto exit_decoder;
 	}
 
-	init_status = FLAC__stream_decoder_init_FILE(
+	if (decode_fp) {
+		init_status = FLAC__stream_decoder_init_FILE(
 				md_flac_decoder,
 				file,
 				md_flac_write_cb,
 				md_flac_metadata_cb,
 				md_flac_error_cb,
 				(void*)decoder_data
-			);
+				);
+	}
+	else {
+		init_status = FLAC__stream_decoder_init_stream(
+				md_flac_decoder,
+				md_flac_read_cb,
+				NULL, NULL, NULL, NULL,
+				md_flac_write_cb,
+				md_flac_metadata_cb,
+				md_flac_error_cb,
+				(void*)decoder_data
+				);
+	}
 
 	ok = init_status == FLAC__STREAM_DECODER_INIT_STATUS_OK;
 
@@ -217,6 +251,16 @@ exit_decoder:
 	return ret;
 }
 
+static int md_flac_decode_fp(md_decoder_data_t* decoder_data) {
+
+	return md_flac_decode_raw(decoder_data, true);
+}
+
+static int md_flac_decode_bytes(md_decoder_data_t* decoder_data) {
+
+	return md_flac_decode_raw(decoder_data, false);
+}
+
 bool md_flac_decodes_file(const char* file) {
 
 	return !strcmp(md_extension_of(file), "flac");
@@ -231,7 +275,7 @@ static md_decoder_t flac_decoder = {
 		.decodes_file = md_flac_decodes_file,
 		.decode_file = NULL,
 		.decode_fp = md_flac_decode_fp,
-		.decode_bytes = NULL,
+		.decode_bytes = md_flac_decode_bytes,
 	}
 };
 

@@ -26,7 +26,7 @@ typedef struct {
 	bool(*decodes_file)(const char*);
 	int(*decode_file)(const char*);
 	int(*decode_fp)(struct md_decoder_data_t*);
-	int(*decode_bytes)(uint8_t*);
+	int(*decode_bytes)(struct md_decoder_data_t*);
 } md_decoder_ops;
 
 typedef struct {
@@ -34,6 +34,7 @@ typedef struct {
 	const char* lib;
 	void* handle;
 	md_decoder_ops ops;
+
 } md_decoder_t;
 
 struct md_decoder_ll {
@@ -79,6 +80,10 @@ typedef struct md_decoder_data_t {
 	pthread_t decoder_thread;
 	int id;
 	void(*dec_completion)(int, dec_status_t);
+
+	int pos;
+	char* buff;
+	int size;
 } md_decoder_data_t;
 
 int md_add_decoded_byte(md_decoder_data_t*, uint8_t);
