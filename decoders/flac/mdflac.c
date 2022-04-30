@@ -72,7 +72,6 @@ void md_flac_metadata_cb(const FLAC__StreamDecoder* decoder,
 
 	md_metadata_init(meta);
 
-	meta->fname = ((md_decoder_data_t*)client_data)->fpath;
 	meta->sample_rate = metadata->data.stream_info.sample_rate;
 	meta->channels = metadata->data.stream_info.channels;
 	meta->bps = metadata->data.stream_info.bits_per_sample;

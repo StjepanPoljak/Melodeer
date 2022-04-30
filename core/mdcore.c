@@ -6,6 +6,7 @@
 #include "mdsettings.h"
 #include "mdbuf.h"
 #include "mddecoder.h"
+#include "mddecoderll.h"
 
 int md_init(md_core_ops_t* md_core_ops) {
 	int ret;
@@ -19,19 +20,13 @@ int md_init(md_core_ops_t* md_core_ops) {
 
 	md_buf_init();
 	md_driver_init();
-	md_decoder_init();
 
 	return 0;
 }
 
-int md_play_async(const char* fname, const char* decoder) {
-
-	return md_decoder_start(fname, decoder, MD_ASYNC_DECODER);
-}
-
 void md_stop(void) {
 
-	md_stop_decoder_engine();
+	//md_stop_decoder_engine();
 	md_buf_flush();
 	md_driver_stop();
 
@@ -42,7 +37,7 @@ void md_resume(void) {
 
 	md_buf_resume();
 	md_driver_resume();
-	md_start_decoder_engine();
+	//md_start_decoder_engine();
 
 	return;
 }
@@ -69,9 +64,6 @@ void md_deinit(bool early) {
 
 	md_decoder_ll_deinit();
 	md_driver_ll_deinit();
-
-	if (!early)
-		md_decoder_deinit();
 
 	return;
 }

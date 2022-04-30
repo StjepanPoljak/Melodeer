@@ -17,6 +17,7 @@ static void sigint_handler(int signal) {
 	return;
 }
 
+/*
 static void md_loaded_metadata(void* data, md_buf_chunk_t* chunk,
 			md_metadata_t* metadata) {
 
@@ -90,6 +91,15 @@ static md_core_ops_t md_core_ops = {
 	.buffer_underrun = md_buffer_underrun,
 	.data = NULL
 };
+*/
+
+static md_playlist_ops_t md_playlist_ops = {
+	.started_playing = NULL,
+	.paused_playing = NULL,
+	.stopped_playing = NULL,
+	.removed_from_list = NULL,
+	.added_to_list = NULL
+};
 
 int main (int argc, const char* argv[]) {
 	int i;
@@ -105,12 +115,12 @@ int main (int argc, const char* argv[]) {
 
 	md_log("Got playlist of size: %d", argc - 1);
 
-	md_playlist_init(&md_core_ops, NULL);
+	md_playlist_init(&md_playlist_ops);
 
 	for (i = 1; i < argc; i++)
 		md_playlist_append(argv[i]);
 
-	md_playlist_play();
+	md_playlist_play(0);
 
 	md_log("Deinitializing...");
 

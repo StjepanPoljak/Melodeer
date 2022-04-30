@@ -1,285 +1,187 @@
 #include "mdplaylist.h"
 
-#include <stdlib.h>
-#include <string.h>
 #include <pthread.h>
+#include <string.h>
 
-#include "mdcore.h"
-#include "mdlog.h"
-#include "mdtime.h"
+#include "mddecoder.h"
 #include "mdpredict.h"
+#include "mdcoreops.h"
 
-typedef enum {
-	MD_PL_QUEUING,
-	MD_PL_PLAYING,
-	MD_PL_NONE
-} md_curr_status_t;
+#define PL_STARTING_SIZE 0
 
-typedef enum {
-	MD_PL_SWITCH_PERCENT,
-	MD_PL_SWITCH_USECONDS,
-	MD_PL_SWITCH_BUFF_CHUNKS
-} md_pl_switch_t;
+#define pl_lock() do { 				\
+	pthread_mutex_lock(&pl_mutex);		\
+} while (0)
 
-typedef struct {
-	md_pl_switch_t pl_switch;
-	unsigned long pl_switch_value;
-} md_pl_settings_t;
+#define pl_unlock() do {			\
+	pthread_mutex_unlock(&pl_mutex);	\
+} while (0)
 
-struct md_pl_ll_t {
-	int index;
-	char* fname;
-	md_curr_status_t status;
-	struct md_pl_ll_t* next;
-	struct md_pl_ll_t* prev;
+#define PL_ASSERT(fn, ...) do {			\
+	int ret;				\
+	if ((ret = fn(__VA_ARGS__))) {		\
+		pl_unlock();			\
+		return ret;			\
+	}					\
+} while (0)
+
+int pl_size;
+int pl_last;
+int pl_active;
+pthread_mutex_t pl_mutex;
+md_decoder_data_t** pl_dec_array;
+md_playlist_ops_t* md_playlist_ops;
+
+static md_core_ops_t pl_core_ops = {
+	.will_load_chunk = NULL,
+	.loaded_metadata = NULL,
+	.first_chunk_take_in = NULL,
+	.last_chunk_take_in = NULL,
+	.last_chunk_take_out = NULL,
+	.stopped = NULL,
+	.playing = NULL,
+	.paused = NULL,
+	.buffer_underrun = NULL,
+	.data = NULL
 };
 
-typedef struct md_pl_ll_t md_pl_ll_t;
+int md_playlist_init(md_playlist_ops_t* ops) {
 
-static struct md_playlist_t {
-	int size;
-	md_pl_ll_t* curr;
-	md_pl_ll_t* head;
-	md_pl_ll_t* last;
-	pthread_mutex_t lmutex;
+	pl_size = PL_STARTING_SIZE;
+	pl_last = -1;
+	pl_active = -1;
+	md_playlist_ops = ops;
+	md_set_core_ops(&pl_core_ops);
 
-	bool running;
-	md_pl_settings_t settings;
-	pthread_mutex_t mutex;
-	pthread_cond_t cond;
-	md_core_ops_t md_core_ops;
-	void(*will_load_chunk_usr_cb)(void*, md_buf_chunk_t*);
-	void(*stopped_usr_cb)(void*);
-	void(*start_take_in_usr_cb)(void*, md_buf_chunk_t*);
-	void(*last_chunk_take_in_usr_cb)(void*, md_buf_chunk_t*);
-	void(*started_playing_file)(int, const char*, void*, md_buf_chunk_t*);
-} mdplaylist;
+	pthread_mutex_init(&pl_mutex, NULL);
 
-static void md_playlist_done(void) {
-
-	pthread_mutex_lock(&mdplaylist.mutex);
-	mdplaylist.running = false;
-	pthread_cond_signal(&mdplaylist.cond);
-	pthread_mutex_unlock(&mdplaylist.mutex);
-
-	return;
-}
-
-static void md_pl_stopped_cb(void* data) {
-
-	md_playlist_done();
-
-	return;
-}
-
-static void md_playlist_setup_start_event(void* data,
-					  md_buf_chunk_t* buf_chunk,
-					  int* decoder_start_event) {
-	int buf_chunks;
-
-	switch (mdplaylist.settings.pl_switch) {
-	case MD_PL_SWITCH_PERCENT:
-		*decoder_start_event = (buf_chunk->metadata->total_buf_chunks
-				     *  mdplaylist.settings.pl_switch_value)
-				     /  100;
-		break;
-
-	case MD_PL_SWITCH_USECONDS:
-		buf_chunks = md_usec_to_buf_chunks(
-				buf_chunk->metadata, buf_chunk->size,
-				mdplaylist.settings.pl_switch_value);
-		*decoder_start_event = (buf_chunk->metadata->total_buf_chunks
-				     >  buf_chunks)
-				     * (buf_chunk->metadata->total_buf_chunks
-				     -  buf_chunks);
-		break;
-
-	case MD_PL_SWITCH_BUFF_CHUNKS:
-
-		*decoder_start_event = (buf_chunk->metadata->total_buf_chunks
-				     >  mdplaylist.settings.pl_switch_value)
-				     * (buf_chunk->metadata->total_buf_chunks
-				     -  mdplaylist.settings.pl_switch_value);
-		break;
-
-	default:
-		break;
-
-	}
-
-	md_log("Will start new at %d (%d)", *decoder_start_event,
-	       buf_chunk->metadata->total_buf_chunks);
-
-}
-
-static void md_pl_started_playing_file_default_cb(int index,
-						  const char* fname,
-						  void* data,
-						  md_buf_chunk_t* buf_chunk) {
-	(void)data;
-
-	md_log("Got file (%d) time: %.4fs (%s)", index,
-	       md_buf_len_sec(buf_chunk->metadata, buf_chunk->size)
-	     * buf_chunk->metadata->total_buf_chunks,
-	       fname);
-
-	return;
-}
-
-static int decoder_start_event = 0;
-
-static void md_pl_start_take_in_cb(void* data, md_buf_chunk_t* buf_chunk) {
-
-	if (md_likely(mdplaylist.curr->next))
-		md_playlist_setup_start_event(data, buf_chunk,
-					      &decoder_start_event);
-
-	mdplaylist.started_playing_file(mdplaylist.curr->index,
-					mdplaylist.curr->fname,
-					data, buf_chunk);
-
-	mdplaylist.start_take_in_usr_cb(mdplaylist.md_core_ops.data,
-					buf_chunk);
-
-	return;
-}
-
-static void md_pl_will_load_chunk_cb(void* data, md_buf_chunk_t* buf_chunk) {
-
-	if (md_unlikely(buf_chunk->order == decoder_start_event))
-		if (md_likely(mdplaylist.curr && mdplaylist.curr->next))
-			md_play_async(mdplaylist.curr->next->fname, NULL);
-
-	decoder_start_event =  decoder_start_event
-			    * (buf_chunk->order
-			   !=  buf_chunk->metadata->total_buf_chunks - 1);
-
-	mdplaylist.will_load_chunk_usr_cb(mdplaylist.md_core_ops.data,
-					  buf_chunk);
-
-	return;
-}
-
-static void md_pl_last_chunk_take_in_cb(void* data, md_buf_chunk_t* chunk) {
-	(void)data, (void)chunk;
-
-	mdplaylist.curr = mdplaylist.curr->next;
-
-	mdplaylist.last_chunk_take_in_usr_cb(data, chunk);
-
-	return;
-}
-
-static void md_core_wait(void) {
-
-	pthread_mutex_lock(&mdplaylist.mutex);
-	while (mdplaylist.running)
-		pthread_cond_wait(&mdplaylist.cond, &mdplaylist.mutex);
-	pthread_mutex_unlock(&mdplaylist.mutex);
-
-	return;
-}
-
-int md_playlist_append(const char* fname) {
-	md_pl_ll_t* new;
-
-	new = malloc(sizeof(*new));
-	if (!new) {
-		md_error("Could not allocate memory.");
-		return -ENOMEM;
-	}
-
-	new->fname = strdup(fname);
-
-	pthread_mutex_lock(&mdplaylist.lmutex);
-	if (md_unlikely(!mdplaylist.last && !mdplaylist.head)) {
-		new->next = NULL;
-		new->prev = NULL;
-		new->index = 0;
-		mdplaylist.last = new;
-		mdplaylist.head = new;
-	}
-	else {
-		new->next = NULL;
-		new->prev = mdplaylist.last;
-		new->index = mdplaylist.last->index + 1;
-		mdplaylist.last->next = new;
-		mdplaylist.last = new;
-	}
-
-	mdplaylist.size++;
-	pthread_mutex_unlock(&mdplaylist.lmutex);
+	pl_dec_array = PL_STARTING_SIZE > 0
+		     ? malloc(sizeof(*pl_dec_array) * PL_STARTING_SIZE)
+		     : NULL;
 
 	return 0;
 }
 
-void md_playlist_init(md_core_ops_t* md_pl_ops,
-		      void(*started_playing_file)(int, const char*,
-						  void*, md_buf_chunk_t*)) {
+static inline int __md_playlist_adjust_size(void) {
+	md_decoder_data_t** temp;
 
-	memcpy(&mdplaylist.md_core_ops, md_pl_ops,
-	       sizeof(mdplaylist.md_core_ops));
+	if (md_unlikely(!pl_dec_array)) {
+		pl_size = 1;
+		pl_dec_array = malloc(sizeof(*pl_dec_array));
 
-	mdplaylist.md_core_ops.will_load_chunk = md_pl_will_load_chunk_cb;
-	mdplaylist.md_core_ops.stopped = md_pl_stopped_cb;
-	mdplaylist.md_core_ops.last_chunk_take_in
-					= md_pl_last_chunk_take_in_cb;
-	mdplaylist.md_core_ops.first_chunk_take_in
-					= md_pl_start_take_in_cb;
+		if (md_unlikely(!pl_dec_array))
+			return -ENOMEM;
 
-	mdplaylist.will_load_chunk_usr_cb = md_pl_ops->will_load_chunk;
-	mdplaylist.stopped_usr_cb = md_pl_ops->stopped;
-	mdplaylist.last_chunk_take_in_usr_cb = md_pl_ops->last_chunk_take_in;
-	mdplaylist.start_take_in_usr_cb = md_pl_ops->first_chunk_take_in;
-
-	mdplaylist.started_playing_file
-				= started_playing_file
-				? started_playing_file
-				: md_pl_started_playing_file_default_cb;
-
-	mdplaylist.curr = NULL;
-	mdplaylist.head = NULL;
-	mdplaylist.last = NULL;
-	mdplaylist.size = 0;
-
-	mdplaylist.running = true;
-
-	//mdplaylist.settings.pl_switch = MD_PL_SWITCH_PERCENT;
-	//mdplaylist.settings.pl_switch_value = 70;
-
-	mdplaylist.settings.pl_switch = MD_PL_SWITCH_USECONDS;
-	mdplaylist.settings.pl_switch_value = 60000000;
-
-	pthread_mutex_init(&mdplaylist.lmutex, NULL);
-	pthread_mutex_init(&mdplaylist.mutex, NULL);
-	pthread_cond_init(&mdplaylist.cond, NULL);
-
-	md_init(&mdplaylist.md_core_ops);
-
-	return;
-}
-
-int md_playlist_play(void) {
-	int ret;
-
-	mdplaylist.curr = mdplaylist.head;
-	ret = md_play_async(mdplaylist.curr->fname, NULL);
-	if (ret) {
-		md_error("Could not start playlist.");
-		return ret;
+		return 0;
 	}
 
-	md_core_wait();
+	if (md_unlikely(pl_size <= pl_last + 1)) {
+		pl_size *= 2;
+		memcpy(temp, pl_dec_array, pl_last + 1);
+		pl_dec_array = realloc(pl_dec_array,
+				       sizeof(*pl_dec_array) * pl_size);
+
+		if (md_unlikely(!pl_dec_array))
+			return -ENOMEM;
+
+		memcpy(pl_dec_array, temp, pl_last + 1);
+
+		return 0;
+	}
+
+	return 0;
+}
+
+static inline int __md_playlist_alloc(int el) {
+
+	if (md_unlikely(el >= pl_size))
+		return -EINVAL;
+
+	pl_dec_array[el] = malloc(sizeof(*(pl_dec_array[el])));
+	if (md_unlikely(!pl_dec_array[el]))
+		return -ENOMEM;
+
+	return 0;
+}
+
+int md_playlist_append(const char* fpath) {
+
+	pl_lock();
+	PL_ASSERT(__md_playlist_adjust_size);
+	PL_ASSERT(__md_playlist_alloc, ++pl_last);
+	md_decoder_init(pl_dec_array[pl_last], fpath, NULL);
+	PL_EXEC(added_to_list, pl_last);
+	pl_unlock();
+
+	return 0;
+}
+
+int md_playlist_insert_at(const char* fpath, int el) {
+	unsigned int i;
+
+	pl_lock();
+	PL_ASSERT(__md_playlist_adjust_size);
+	pl_last++;
+
+	for (i = pl_last; i > el; i--)
+		pl_dec_array[i] = pl_dec_array[i - 1];
+
+	PL_ASSERT(__md_playlist_alloc, el);
+	md_decoder_init(pl_dec_array[el], fpath, NULL);
+	pl_unlock();
+
+	return 0;
+}
+
+int md_playlist_remove(int el) {
+
+	pl_lock();
+
+	if (md_unlikely(pl_active == el)) {
+		pl_unlock();
+		return -EINVAL;
+	}
+
+	PL_EXEC(removed_from_list, el);
+
+	pl_unlock();
+
+	return 0;
+}
+
+int md_playlist_play(int el) {
 
 	return 0;
 }
 
 void md_playlist_deinit(void) {
 
-	md_deinit(false);
+	pl_lock();
 
-	pthread_mutex_destroy(&mdplaylist.mutex);
-	pthread_cond_destroy(&mdplaylist.cond);
+	pl_unlock();
+
+	pthread_mutex_destroy(&pl_mutex);
 
 	return;
+}
+
+void for_each_in_pl(bool (*fn)(const char*, md_metadata_t*)) {
+	unsigned int i;
+
+	pl_lock();
+
+	for (i = 0; i <= pl_last; i++) {
+		if (md_unlikely(!fn(pl_dec_array[i]->fpath,
+				    pl_dec_array[i]->metadata)))
+		break;
+	}
+
+	pl_unlock();
+
+	return;
+}
+
+bool md_no_more_decoders(void) {
+
+	return false;
 }

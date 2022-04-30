@@ -1,6 +1,14 @@
 #ifndef MD_LL_H
 #define MD_LL_H
 
+#define __ll_define(_type)				\
+	struct md_##_type##_ll {			\
+		md_##_type##_t* _type;			\
+		struct md_##_type##_ll* next;		\
+	};						\
+							\
+	typedef struct md_##_type##_ll md_##_type##_ll;
+
 #define __ll_init(_head)				\
 do {							\
 	(_head) = NULL;					\
